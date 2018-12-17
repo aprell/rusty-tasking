@@ -16,6 +16,7 @@ pub trait Task: Send {
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
     use super::*;
 
     // From TRPL: "The golden rule of dynamically sized types is that we must
@@ -46,6 +47,17 @@ mod tests {
         let a = Box::new(SimpleTask::new(Box::new(|| 1)));
         a.run();
         // `a` has been consumed
+    }
+
+    #[test]
+    fn simple_task_to_thread() {
+        // Unboxed task + boxed closure
+        let mut a = SimpleTask::new(Box::new(|| 1));
+        thread::spawn(move || a.0()).join().unwrap();
+
+        // Boxed task + boxed closure
+        let a = Box::new(SimpleTask::new(Box::new(|| 1)));
+        thread::spawn(move || a.run()).join().unwrap();
     }
 
     #[test]
