@@ -28,6 +28,11 @@ mod tests {
         fn new(task: Box<Thunk<T>>) -> SimpleTask<T> {
             SimpleTask(task)
         }
+
+        fn run(mut self) {
+            // Ignore result
+            let _ = self.0();
+        }
     }
 
     impl<T> Task for SimpleTask<T> {
@@ -40,8 +45,9 @@ mod tests {
     #[test]
     fn simple_task() {
         // Unboxed task + boxed closure
-        let mut a = SimpleTask::new(Box::new(|| 1));
-        a.0();
+        let a = SimpleTask::new(Box::new(|| 1));
+        a.run();
+        // `a` has been consumed
 
         // Boxed task + boxed closure
         let a = Box::new(SimpleTask::new(Box::new(|| 1)));
@@ -52,8 +58,8 @@ mod tests {
     #[test]
     fn simple_task_to_thread() {
         // Unboxed task + boxed closure
-        let mut a = SimpleTask::new(Box::new(|| 1));
-        thread::spawn(move || a.0()).join().unwrap();
+        let a = SimpleTask::new(Box::new(|| 1));
+        thread::spawn(move || a.run()).join().unwrap();
 
         // Boxed task + boxed closure
         let a = Box::new(SimpleTask::new(Box::new(|| 1)));
