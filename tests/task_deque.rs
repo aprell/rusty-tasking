@@ -1,4 +1,4 @@
-use rusty_tasking::deque::{Deque, StealOne, StealMany};
+use rusty_tasking::deque::{Deque, Steal, StealMany};
 use rusty_tasking::task::{Task, Thunk};
 use std::thread;
 

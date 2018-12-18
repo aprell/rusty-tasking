@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-pub trait StealOne<T> {
+pub trait Steal<T> {
     fn steal(&mut self) -> Option<T>;
 }
 
@@ -35,7 +35,7 @@ impl<T> Deque<T> {
     }
 }
 
-impl<T> StealOne<T> for Deque<T> {
+impl<T> Steal<T> for Deque<T> {
     fn steal(&mut self) -> Option<T> {
         self.0.pop_back()
     }
