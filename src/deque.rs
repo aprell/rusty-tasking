@@ -4,7 +4,9 @@ pub trait Steal<T> {
     fn steal(&mut self) -> Option<T>;
 }
 
-pub trait StealMany<T> {
+// Could provide a default, though inefficient, implementation of `steal_many`
+// in terms of `steal`
+pub trait StealMany<T>: Steal<T> {
     type Loot;
 
     fn steal_many(&mut self) -> Option<Self::Loot>;
