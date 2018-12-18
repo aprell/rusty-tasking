@@ -1,3 +1,5 @@
+use std::sync::mpsc::{Sender, Receiver};
+
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
 // closure that implements `FnMut` may capture variables by reference or
@@ -14,8 +16,33 @@ pub trait Task: Send {
     fn run(self: Box<Self>);
 }
 
+// Futures and promises
+
+pub struct Future<T>(Receiver<T>);
+
+impl<T> Future<T> {
+    // Block until result is available
+    pub fn get(self) -> T {
+        self.0.recv().unwrap()
+    }
+
+    // Try to overlap waiting with useful work
+    pub fn wait(self) -> T {
+        unimplemented!();
+    }
+}
+
+pub struct Promise<T>(Sender<T>);
+
+impl<T> Promise<T> {
+    pub fn set(self, result: T) {
+        self.0.send(result).unwrap();
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc;
     use std::thread;
     use super::*;
 
@@ -100,5 +127,28 @@ mod tests {
             // `t` has type `Box<Task>`, which can be moved into `run`
             t.run();
         }
+    }
+
+    #[test]
+    fn future_promise() {
+        let (sender, receiver) = mpsc::channel();
+        Promise(sender).set(1);
+        assert_eq!(Future(receiver).get(), 1);
+    }
+
+    #[test]
+    fn future_promise_thread() {
+        let (sender1, receiver1) = mpsc::channel();
+
+        let t = thread::spawn(|| {
+            let (sender2, receiver2) = mpsc::channel();
+            Promise(sender1).set(("ping", Promise(sender2)));
+            assert_eq!(Future(receiver2).get(), "pong");
+        });
+
+        let (msg, promise) = Future(receiver1).get();
+        assert_eq!(msg, "ping");
+        promise.set("pong");
+        t.join().unwrap();
     }
 }
