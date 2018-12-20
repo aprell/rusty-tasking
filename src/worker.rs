@@ -1,12 +1,19 @@
+use std::cell::RefCell;
 use std::sync::mpsc::{channel, Sender, Receiver};
+
+use crate::deque::*;
+use crate::task::*;
+
+type TaskDeque = Deque<Box<Task>>;
 
 pub struct Worker {
     id: usize,
+    deque: RefCell<TaskDeque>,
     tasks: (Sender<Tasks>, Receiver<Tasks>),
 }
 
 #[derive(Debug)]
-struct StealRequest {
+pub struct StealRequest {
     thief: usize,
     steal_many: bool,
     response: Sender<Tasks>,
@@ -15,12 +22,45 @@ struct StealRequest {
 // Possible responses to a steal request
 enum Tasks {
     None,
+    One(Box<Task>),
+    Many(TaskDeque),
     Exit,
 }
 
 impl Worker {
     pub fn new(id: usize) -> Worker {
-        Worker { id, tasks: channel() }
+        Worker {
+            id,
+            deque: RefCell::new(Deque::new()),
+            tasks: channel(),
+        }
+    }
+
+    pub fn handle_steal_request(&self, req: StealRequest) {
+        let response = req.response;
+        if req.steal_many {
+            match self.deque.borrow_mut().steal_many() {
+                Some(tasks) => response.send(Tasks::Many(tasks)).unwrap(),
+                None => response.send(Tasks::None).unwrap(),
+            }
+        } else {
+            match self.deque.borrow_mut().steal() {
+                Some(task) => response.send(Tasks::One(task)).unwrap(),
+                None => response.send(Tasks::None).unwrap(),
+            }
+        }
+    }
+
+    pub fn has_tasks(&self) -> bool {
+        !self.deque.borrow_mut().is_empty()
+    }
+
+    pub fn push(&self, task: Box<Task>) {
+        self.deque.borrow_mut().push(task);
+    }
+
+    pub fn pop(&self) -> Option<Box<Task>> {
+        self.deque.borrow_mut().pop()
     }
 
     // Regular worker loop
@@ -31,7 +71,6 @@ impl Worker {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
     use std::thread;
     use super::*;
 
@@ -55,6 +94,7 @@ mod tests {
                     match worker.tasks.1.recv().unwrap() {
                         Tasks::None => (),
                         Tasks::Exit => break,
+                        _ => unreachable!(),
                     }
                 }
             }));
