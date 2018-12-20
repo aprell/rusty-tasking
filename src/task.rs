@@ -1,4 +1,4 @@
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
@@ -14,6 +14,53 @@ pub type Thunk<T> = FnMut() -> T + Send + 'static;
 // that can be sent between threads safely are allowed to implement `Task`.
 pub trait Task: Send {
     fn run(self: Box<Self>);
+}
+
+// A task with return type `T`
+pub struct Async<T> {
+    task: Box<Thunk<T>>,
+    promise: Option<Promise<T>>,
+}
+
+impl Async<()> {
+    // Constructor for tasks without return values (cannot overload `new`)
+    pub fn task(task: Box<Thunk<()>>) -> Async<()> {
+        Async { task, promise: None }
+    }
+}
+
+impl<T> Async<T> {
+    // Constructor for tasks with return values
+    pub fn future(task: Box<Thunk<T>>) -> (Async<T>, Future<T>)  {
+        let (sender, receiver) = channel();
+        let promise = Some(Promise(sender));
+        (Async { task, promise }, Future(receiver))
+    }
+
+    pub fn run(mut self) {
+        let result = (self.task)();
+        match self.promise {
+            Some(promise) => promise.set(result),
+            None => (),
+        }
+    }
+}
+
+use std::fmt;
+
+impl<T> fmt::Debug for Async<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match (*self).promise {
+            Some(_) => write!(f, "<Future>"),
+            None => write!(f, "<Task>"),
+        }
+    }
+}
+
+impl<T> Task for Async<T> where T: Send {
+    fn run(self: Box<Async<T>>) {
+        (*self).run();
+    }
 }
 
 // Futures and promises
@@ -42,7 +89,6 @@ impl<T> Promise<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc;
     use std::thread;
     use super::*;
 
@@ -131,17 +177,17 @@ mod tests {
 
     #[test]
     fn future_promise() {
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = channel();
         Promise(sender).set(1);
         assert_eq!(Future(receiver).get(), 1);
     }
 
     #[test]
     fn future_promise_thread() {
-        let (sender1, receiver1) = mpsc::channel();
+        let (sender1, receiver1) = channel();
 
         let t = thread::spawn(|| {
-            let (sender2, receiver2) = mpsc::channel();
+            let (sender2, receiver2) = channel();
             Promise(sender1).set(("ping", Promise(sender2)));
             assert_eq!(Future(receiver2).get(), "pong");
         });
@@ -149,6 +195,26 @@ mod tests {
         let (msg, promise) = Future(receiver1).get();
         assert_eq!(msg, "ping");
         promise.set("pong");
+        t.join().unwrap();
+    }
+
+    #[test]
+    fn async_task() {
+        let a = Async::task(Box::new(|| ()));
+        a.run();
+        // `a` has been consumed
+
+        let (a, f) = Async::future(Box::new(|| 3.14));
+        a.run();
+        // `a` has been consumed
+        assert_eq!(f.get(), 3.14);
+    }
+
+    #[test]
+    fn async_task_to_thread() {
+        let (a, f) = Async::future(Box::new(|| "hi"));
+        let t = thread::spawn(|| a.run());
+        assert_eq!(f.get(), "hi");
         t.join().unwrap();
     }
 }
