@@ -117,6 +117,67 @@ mod tests {
         }
     }
 
+    #[test]
+    fn distribute_tasks() {
+        let mut workers = Vec::with_capacity(2);
+        let (sender, receiver) = channel();
+
+        // Create two workers that send steal requests to us
+        for i in 0..2 {
+            let sender = sender.clone();
+            workers.push(thread::spawn(move || {
+                let worker = Worker::new(i+1);
+                // ===== Worker loop =====
+                loop {
+                    // Worker 1 asks for single tasks, worker 2 asks for more
+                    sender.send(StealRequest {
+                        thief: worker.id,
+                        steal_many: if worker.id == 1 { false } else { true },
+                        response: worker.tasks.0.clone(),
+                    }).unwrap();
+                    match worker.tasks.1.recv().unwrap() {
+                        Tasks::None => (),
+                        Tasks::One(task) => {
+                            assert_eq!(worker.id, 1);
+                            task.run();
+                        }
+                        Tasks::Many(mut loot) => {
+                            assert_eq!(worker.id, 2);
+                            while let Some(task) = loot.pop() {
+                                task.run();
+                            }
+                        }
+                        Tasks::Exit => break,
+                    }
+                }
+            }));
+        }
+
+        // Create a few dummy tasks
+        let master = Worker::new(0);
+        for _ in 0..10 {
+            let task = Async::task(Box::new(|| ()));
+            master.push(Box::new(task));
+        }
+
+        // Distribute tasks until deque is empty
+        while master.has_tasks() {
+            let req = receiver.recv().unwrap();
+            master.handle_steal_request(req);
+            // `req` consumed
+        }
+
+        // Ask workers to terminate
+        for _ in 0..2 {
+            let req = receiver.recv().unwrap();
+            req.response.send(Tasks::Exit).unwrap();
+        }
+
+        for worker in workers {
+            worker.join().unwrap();
+        }
+    }
+
     thread_local! {
         // See interior mutability pattern
         static ID: RefCell<usize> = RefCell::new(0);
