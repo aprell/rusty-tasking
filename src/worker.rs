@@ -46,6 +46,10 @@ impl Worker {
         }
     }
 
+    pub fn select_victim(&self, id: usize) -> Option<&Coworker> {
+        self.coworkers.iter().find(|&c| c.id == id)
+    }
+
     pub fn handle_steal_request(&self, req: StealRequest) {
         let response = req.response;
         if req.steal_many {
@@ -139,7 +143,7 @@ mod tests {
                 let worker = Worker::new(i+1, channel, coworkers);
                 // ===== Worker loop =====
                 loop {
-                    let ref victim = worker.coworkers[0];
+                    let victim = worker.select_victim(0).unwrap();
                     victim.send_steal_request(StealRequest {
                         thief: worker.id,
                         steal_many: false,
@@ -187,7 +191,7 @@ mod tests {
                 // ===== Worker loop =====
                 loop {
                     // Worker 1 asks for single tasks, worker 2 asks for more
-                    let ref victim = worker.coworkers[0];
+                    let victim = worker.select_victim(0).unwrap();
                     victim.send_steal_request(StealRequest {
                         thief: worker.id,
                         steal_many: if worker.id == 1 { false } else { true },
@@ -230,6 +234,63 @@ mod tests {
         for _ in 0..2 {
             let req = master.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::Exit).unwrap();
+        }
+
+        for worker in workers {
+            worker.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn worker_communication() {
+        let mut workers = Vec::with_capacity(2);
+        let (mut channels, coworkers) = setup(3);
+
+        // Create two workers that communicate with each other
+        for i in 0..2 {
+            let channel = channels.remove(1);
+            let coworkers = coworkers.clone();
+            workers.push(thread::spawn(move || {
+                let worker = Worker::new(i+1, channel, coworkers);
+                match worker.id {
+                    // Worker 1 sends steal requests to worker 2
+                    1 => {
+                        loop {
+                            let victim = worker.select_victim(2).unwrap();
+                            victim.send_steal_request(StealRequest {
+                                thief: worker.id,
+                                steal_many: true,
+                                response: worker.channels.tasks.0.clone(),
+                            });
+                            match worker.channels.tasks.1.recv().unwrap() {
+                                Tasks::None => (),
+                                Tasks::One(task) => task.run(),
+                                Tasks::Many(mut loot) => {
+                                    while let Some(task) = loot.pop() {
+                                        task.run();
+                                    }
+                                }
+                                Tasks::Exit => break,
+                            }
+                        }
+                    }
+                    // Worker 2 creates a few tasks and handles steal requests
+                    2 => {
+                        for _ in 0..10 {
+                            let task = Async::task(Box::new(|| ()));
+                            worker.push(Box::new(task));
+                        }
+                        while worker.has_tasks() {
+                            let req = worker.channels.steal_requests.recv().unwrap();
+                            worker.handle_steal_request(req);
+                        }
+                        // Send `Tasks::Exit` to worker 1 and exit
+                        let req = worker.channels.steal_requests.recv().unwrap();
+                        req.response.send(Tasks::Exit).unwrap();
+                    }
+                    _ => unreachable!()
+                }
+            }));
         }
 
         for worker in workers {
