@@ -4,14 +4,6 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use crate::deque::*;
 use crate::task::*;
 
-type TaskDeque = Deque<Box<Task>>;
-
-pub struct Worker {
-    id: usize,
-    deque: RefCell<TaskDeque>,
-    tasks: (Sender<Tasks>, Receiver<Tasks>),
-}
-
 #[derive(Debug)]
 pub struct StealRequest {
     thief: usize,
@@ -27,12 +19,30 @@ enum Tasks {
     Exit,
 }
 
+type TaskDeque = Deque<Box<Task>>;
+
+struct WorkerChannels {
+    steal_requests: Receiver<StealRequest>,
+    tasks: (Sender<Tasks>, Receiver<Tasks>),
+}
+
+pub struct Worker {
+    id: usize,
+    deque: RefCell<TaskDeque>,
+    channels: WorkerChannels,
+    coworkers: Vec<Coworker>,
+}
+
 impl Worker {
-    pub fn new(id: usize) -> Worker {
+    pub fn new(id: usize,
+               steal_requests: Receiver<StealRequest>,
+               coworkers: Vec<Coworker>) -> Worker
+    {
         Worker {
             id,
             deque: RefCell::new(Deque::new()),
-            tasks: channel(),
+            channels: WorkerChannels { steal_requests, tasks: channel() },
+            coworkers: coworkers.into_iter().filter(|c| c.id != id).collect(),
         }
     }
 
@@ -69,29 +79,73 @@ impl Worker {
     }
 }
 
+#[derive(Debug)]
+pub struct Coworker {
+    id: usize,
+    steal_requests: Sender<StealRequest>,
+}
+
+impl Coworker {
+    pub fn send_steal_request(&self, req: StealRequest) {
+        assert_ne!(self.id, req.thief);
+        self.steal_requests.send(req).unwrap();
+    }
+}
+
+impl Clone for Coworker {
+    fn clone(&self) -> Self {
+        Coworker {
+            id: self.id,
+            steal_requests: Sender::clone(&self.steal_requests),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread;
     use super::*;
 
+    fn setup(num_workers: usize) -> (Vec<Receiver<StealRequest>>, Vec<Coworker>) {
+        // `N` workers communicate using `N` channels
+        let channels = (0..num_workers)
+            .map(|_| channel())
+            .collect::<Vec<(Sender<StealRequest>, _)>>();
+
+        let coworkers = channels
+            .iter()
+            .enumerate()
+            .map(|(i, (chan, _))| Coworker { id: i, steal_requests: Sender::clone(&chan) })
+            .collect::<Vec<Coworker>>();
+
+        let channels = channels
+            .into_iter()
+            .map(|(_, r)| r)
+            .collect::<Vec<Receiver<StealRequest>>>();
+
+        (channels, coworkers)
+    }
+
     #[test]
     fn create_and_shutdown() {
         let mut workers = Vec::with_capacity(2);
-        let (sender, receiver) = channel();
+        let (mut channels, coworkers) = setup(3);
 
         // Create two workers that send steal requests to us
         for i in 0..2 {
-            let sender = sender.clone();
+            let channel = channels.remove(1);
+            let coworkers = coworkers.clone();
             workers.push(thread::spawn(move || {
-                let worker = Worker::new(i+1);
+                let worker = Worker::new(i+1, channel, coworkers);
                 // ===== Worker loop =====
                 loop {
-                    sender.send(StealRequest {
+                    let ref victim = worker.coworkers[0];
+                    victim.send_steal_request(StealRequest {
                         thief: worker.id,
                         steal_many: false,
-                        response: worker.tasks.0.clone(),
-                    }).unwrap();
-                    match worker.tasks.1.recv().unwrap() {
+                        response: worker.channels.tasks.0.clone(),
+                    });
+                    match worker.channels.tasks.1.recv().unwrap() {
                         Tasks::None => (),
                         Tasks::Exit => break,
                         _ => unreachable!(),
@@ -100,15 +154,17 @@ mod tests {
             }));
         }
 
+        let master = Worker::new(0, channels.remove(0), coworkers);
+
         // Respond to the first ten steal requests with `Tasks::None`
         for _ in 0..10 {
-            let req = receiver.recv().unwrap();
+            let req = master.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::None).unwrap();
         }
 
         // Respond with `Tasks::Exit` and join the workers
         for _ in 0..2 {
-            let req = receiver.recv().unwrap();
+            let req = master.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::Exit).unwrap();
         }
 
@@ -120,22 +176,24 @@ mod tests {
     #[test]
     fn distribute_tasks() {
         let mut workers = Vec::with_capacity(2);
-        let (sender, receiver) = channel();
+        let (mut channels, coworkers) = setup(3);
 
         // Create two workers that send steal requests to us
         for i in 0..2 {
-            let sender = sender.clone();
+            let channel = channels.remove(1);
+            let coworkers = coworkers.clone();
             workers.push(thread::spawn(move || {
-                let worker = Worker::new(i+1);
+                let worker = Worker::new(i+1, channel, coworkers);
                 // ===== Worker loop =====
                 loop {
                     // Worker 1 asks for single tasks, worker 2 asks for more
-                    sender.send(StealRequest {
+                    let ref victim = worker.coworkers[0];
+                    victim.send_steal_request(StealRequest {
                         thief: worker.id,
                         steal_many: if worker.id == 1 { false } else { true },
-                        response: worker.tasks.0.clone(),
-                    }).unwrap();
-                    match worker.tasks.1.recv().unwrap() {
+                        response: worker.channels.tasks.0.clone(),
+                    });
+                    match worker.channels.tasks.1.recv().unwrap() {
                         Tasks::None => (),
                         Tasks::One(task) => {
                             assert_eq!(worker.id, 1);
@@ -153,8 +211,9 @@ mod tests {
             }));
         }
 
+        let master = Worker::new(0, channels.remove(0), coworkers);
+
         // Create a few dummy tasks
-        let master = Worker::new(0);
         for _ in 0..10 {
             let task = Async::task(Box::new(|| ()));
             master.push(Box::new(task));
@@ -162,14 +221,14 @@ mod tests {
 
         // Distribute tasks until deque is empty
         while master.has_tasks() {
-            let req = receiver.recv().unwrap();
+            let req = master.channels.steal_requests.recv().unwrap();
             master.handle_steal_request(req);
             // `req` consumed
         }
 
         // Ask workers to terminate
         for _ in 0..2 {
-            let req = receiver.recv().unwrap();
+            let req = master.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::Exit).unwrap();
         }
 
