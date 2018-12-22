@@ -136,6 +136,10 @@ pub struct Coworker {
 }
 
 impl Coworker {
+    pub fn new(id: usize, steal_requests: Sender<StealRequest>) -> Coworker {
+        Coworker { id, steal_requests }
+    }
+
     pub fn send_steal_request(&self, req: StealRequest) {
         assert_ne!(self.id, req.thief);
         self.steal_requests.send(req).unwrap();
@@ -165,7 +169,7 @@ mod tests {
         let coworkers = channels
             .iter()
             .enumerate()
-            .map(|(i, (chan, _))| Coworker { id: i, steal_requests: Sender::clone(&chan) })
+            .map(|(i, (chan, _))| Coworker::new(i, Sender::clone(&chan)))
             .collect::<Vec<Coworker>>();
 
         let channels = channels
