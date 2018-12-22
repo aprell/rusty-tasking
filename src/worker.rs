@@ -1,3 +1,4 @@
+use rand::Rng;
 use std::cell::RefCell;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
@@ -50,6 +51,13 @@ impl Worker {
         self.coworkers.iter().find(|&c| c.id == id)
     }
 
+    // Send steal request to random worker != self
+    pub fn send_steal_request(&self, req: StealRequest) {
+        let rand_idx: usize = rand::thread_rng().gen_range(0, self.coworkers.len());
+        let ref victim = self.coworkers[rand_idx];
+        victim.send_steal_request(req);
+    }
+
     pub fn handle_steal_request(&self, req: StealRequest) {
         let response = req.response;
         if req.steal_many {
@@ -65,6 +73,13 @@ impl Worker {
         }
     }
 
+    pub fn try_handle_steal_request(&self) {
+        let req = self.channels.steal_requests.try_recv();
+        if let Ok(req) = req {
+            self.handle_steal_request(req);
+        }
+    }
+
     pub fn has_tasks(&self) -> bool {
         !self.deque.borrow_mut().is_empty()
     }
@@ -77,9 +92,40 @@ impl Worker {
         self.deque.borrow_mut().pop()
     }
 
-    // Regular worker loop
+    // General worker loop
     pub fn go(&self) {
-        unimplemented!();
+        loop {
+            // (1) Do local work
+            while let Some(task) = self.pop() {
+                self.try_handle_steal_request();
+                task.run();
+            }
+            // (2) Request/steal work
+            self.send_steal_request(StealRequest {
+                thief: self.id,
+                steal_many: false,
+                response: self.channels.tasks.0.clone(),
+            });
+            let response = loop {
+                match self.channels.tasks.1.try_recv() {
+                    Ok(response) => break response,
+                    Err(_) => self.try_handle_steal_request(),
+                }
+            };
+            match response {
+                Tasks::None => (),
+                Tasks::One(task) => {
+                    task.run();
+                }
+                Tasks::Many(tasks) => {
+                    let _ = self.deque.replace(tasks);
+                }
+                Tasks::Exit => {
+                    assert!(self.deque.borrow().is_empty());
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -274,7 +320,8 @@ mod tests {
                             }
                         }
                     }
-                    // Worker 2 creates a few tasks and handles steal requests
+                    // Worker 2 creates a few tasks and handles worker 1's
+                    // steal requests
                     2 => {
                         for _ in 0..10 {
                             let task = Async::task(Box::new(|| ()));
