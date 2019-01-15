@@ -32,6 +32,7 @@ pub struct Worker {
     deque: RefCell<TaskDeque>,
     channels: WorkerChannels,
     coworkers: Vec<Coworker>,
+    children: Vec<Sender<Tasks>>,
 }
 
 impl Worker {
@@ -39,12 +40,38 @@ impl Worker {
                steal_requests: Receiver<StealRequest>,
                coworkers: Vec<Coworker>) -> Worker
     {
-        Worker {
+        let mut worker = Worker {
             id,
             deque: RefCell::new(Deque::new()),
             channels: WorkerChannels { steal_requests, tasks: channel() },
             coworkers: coworkers.into_iter().filter(|c| c.id != id).collect(),
+            children: vec![],
+        };
+
+        if id > 0 {
+            // Determine parent and send a dummy steal request
+            let parent_id = (id - 1) / 2;
+            let ref parent = worker.coworkers[parent_id];
+            parent.send_steal_request(StealRequest {
+                thief: id,
+                steal_many: false,
+                response: worker.channels.tasks.0.clone(),
+            });
         }
+
+        // Receive dummy steal requests from children
+        let num_workers = worker.coworkers.len() + 1;
+        let children = (2 * id + 1, 2 * id + 2);
+        if children.0 < num_workers {
+            let req = worker.channels.steal_requests.recv().unwrap();
+            worker.children.push(req.response);
+            if children.1 < num_workers {
+                let req = worker.channels.steal_requests.recv().unwrap();
+                worker.children.push(req.response);
+            }
+        }
+
+        worker
     }
 
     pub fn select_victim(&self, id: usize) -> Option<&Coworker> {
@@ -92,6 +119,12 @@ impl Worker {
         self.deque.borrow_mut().pop()
     }
 
+    pub fn finalize(&self) {
+        for child in self.children.iter() {
+            child.send(Tasks::Exit).unwrap();
+        }
+    }
+
     // General worker loop
     pub fn go(&self) {
         loop {
@@ -126,6 +159,7 @@ impl Worker {
                 }
             }
         }
+        self.finalize();
     }
 }
 
@@ -157,6 +191,7 @@ impl Clone for Coworker {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Barrier};
     use std::thread;
     use super::*;
 
@@ -184,13 +219,16 @@ mod tests {
     fn create_and_shutdown() {
         let mut workers = Vec::with_capacity(2);
         let (mut channels, coworkers) = setup(3);
+        let barrier = Arc::new(Barrier::new(3));
 
         // Create two workers that send steal requests to us
         for i in 0..2 {
             let channel = channels.remove(1);
             let coworkers = coworkers.clone();
+            let barrier = Arc::clone(&barrier);
             workers.push(thread::spawn(move || {
                 let worker = Worker::new(i+1, channel, coworkers);
+                barrier.wait();
                 // ===== Worker loop =====
                 loop {
                     let victim = worker.select_victim(0).unwrap();
@@ -209,6 +247,7 @@ mod tests {
         }
 
         let master = Worker::new(0, channels.remove(0), coworkers);
+        barrier.wait();
 
         // Respond to the first ten steal requests with `Tasks::None`
         for _ in 0..10 {
@@ -231,13 +270,16 @@ mod tests {
     fn distribute_tasks() {
         let mut workers = Vec::with_capacity(2);
         let (mut channels, coworkers) = setup(3);
+        let barrier = Arc::new(Barrier::new(3));
 
         // Create two workers that send steal requests to us
         for i in 0..2 {
             let channel = channels.remove(1);
             let coworkers = coworkers.clone();
+            let barrier = Arc::clone(&barrier);
             workers.push(thread::spawn(move || {
                 let worker = Worker::new(i+1, channel, coworkers);
+                barrier.wait();
                 // ===== Worker loop =====
                 loop {
                     // Worker 1 asks for single tasks, worker 2 asks for more
@@ -266,6 +308,7 @@ mod tests {
         }
 
         let master = Worker::new(0, channels.remove(0), coworkers);
+        barrier.wait();
 
         // Create a few dummy tasks
         for _ in 0..10 {

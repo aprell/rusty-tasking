@@ -1,5 +1,6 @@
 use rusty_tasking::task::{Async};
 use rusty_tasking::worker::{StealRequest, Worker, Coworker};
+use std::sync::{Arc, Barrier};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 
@@ -27,18 +28,23 @@ fn setup(num_workers: usize) -> (Vec<Receiver<StealRequest>>, Vec<Coworker>) {
 fn random_stealing() {
     let mut workers = Vec::with_capacity(3);
     let (mut channels, coworkers) = setup(4);
+    let barrier = Arc::new(Barrier::new(4));
 
     // Create three additional workers
     for i in 0..3 {
         let channel = channels.remove(1);
         let coworkers = coworkers.clone();
+        let barrier = Arc::clone(&barrier);
         workers.push(thread::spawn(move || {
             let worker = Worker::new(i+1, channel, coworkers);
+            barrier.wait();
             worker.go();
+            barrier.wait();
         }));
     }
 
     let master = Worker::new(0, channels.remove(0), coworkers);
+    barrier.wait();
 
     for _ in 0..99 {
         let task = Async::task(Box::new(|| ()));
@@ -53,5 +59,11 @@ fn random_stealing() {
         }
     }
 
-    // TODO Ask workers to terminate
+    // Ask workers to terminate
+    master.finalize();
+    barrier.wait();
+
+    for worker in workers {
+        worker.join().unwrap();
+    }
 }
