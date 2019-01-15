@@ -5,7 +5,7 @@ use std::thread;
 use crate::worker::*;
 
 pub struct Runtime {
-    master: Worker,
+    pub master: Worker,
     workers: Vec<thread::JoinHandle<()>>,
     barrier: Arc<Barrier>,
 }
