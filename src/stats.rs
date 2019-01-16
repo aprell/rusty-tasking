@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::ops::AddAssign;
 
 #[derive(Debug)]
 pub struct Count(Cell<u32>);
@@ -41,6 +42,12 @@ impl Stats {
     }
 }
 
+impl AddAssign for Stats {
+    fn add_assign(&mut self, other: Stats) {
+        self.update(&other);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,8 +68,9 @@ mod tests {
         let s = Stats::new();
         s.num_tasks_executed.increment(100);
 
-        let t = Stats::new();
-        t.update(&s);
+        let mut t = Stats::new();
+        t += s;
+        // `s` has been moved
         assert_eq!(t.num_tasks_executed.get(), 100);
     }
 }

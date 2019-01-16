@@ -55,16 +55,16 @@ impl Runtime {
         Runtime { master, workers, barrier, stats: Stats::new() }
     }
 
-    pub fn join(self) -> Stats {
+    pub fn join(mut self) -> Stats {
         // Ask workers to terminate
         self.master.finalize();
-        self.stats.update(&self.master.stats);
+        self.stats += self.master.stats;
         self.barrier.wait();
 
         // Join workers
         for worker in self.workers {
             let worker_stats = worker.join().unwrap();
-            self.stats.update(&worker_stats);
+            self.stats += worker_stats;
         }
 
         self.stats
