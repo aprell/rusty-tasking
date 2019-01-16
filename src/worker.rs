@@ -130,11 +130,13 @@ impl Worker {
 
     // General worker loop
     pub fn go(&self) {
+        let mut num_tasks_executed = 0;
         loop {
             // (1) Do local work
             while let Some(task) = self.pop() {
                 self.try_handle_steal_request();
                 task.run();
+                num_tasks_executed += 1;
             }
             // (2) Request/steal work
             self.send_steal_request(StealRequest {
@@ -152,6 +154,7 @@ impl Worker {
                 Tasks::None => (),
                 Tasks::One(task) => {
                     task.run();
+                    num_tasks_executed += 1;
                 }
                 Tasks::Many(tasks) => {
                     let _ = self.deque.replace(tasks);
@@ -162,6 +165,7 @@ impl Worker {
                 }
             }
         }
+        self.stats.num_tasks_executed.set(num_tasks_executed);
         self.finalize();
     }
 }

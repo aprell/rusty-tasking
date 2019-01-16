@@ -6,19 +6,26 @@ fn random_stealing() {
     // Create three additional workers
     let runtime = Runtime::init(4);
     let master = &runtime.master;
+    let stats = &master.stats;
 
-    for _ in 0..99 {
+    for _ in 0..999 {
         let task = Async::task(Box::new(|| ()));
         master.push(Box::new(task));
     }
 
+    let mut num_tasks_executed = 0;
     while master.has_tasks() {
         master.try_handle_steal_request();
         match master.pop() {
-            Some(task) => task.run(),
+            Some(task) => {
+                task.run();
+                num_tasks_executed += 1;
+            }
             None => break,
         }
     }
 
-    runtime.join();
+    stats.num_tasks_executed.set(num_tasks_executed);
+    let stats = runtime.join();
+    assert_eq!(stats.num_tasks_executed.get(), 999);
 }
