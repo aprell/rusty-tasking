@@ -2,12 +2,14 @@ use std::sync::{Arc, Barrier};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 
+use crate::stats::*;
 use crate::worker::*;
 
 pub struct Runtime {
     pub master: Worker,
-    workers: Vec<thread::JoinHandle<()>>,
+    workers: Vec<thread::JoinHandle<Stats>>,
     barrier: Arc<Barrier>,
+    stats: Stats,
 }
 
 impl Runtime {
@@ -43,24 +45,29 @@ impl Runtime {
                 barrier.wait();
                 worker.go();
                 barrier.wait();
+                worker.stats
             }));
         }
 
         let master = Worker::new(0, channels.remove(0), coworkers);
         barrier.wait();
 
-        Runtime { master, workers, barrier }
+        Runtime { master, workers, barrier, stats: Stats::new() }
     }
 
-    pub fn join(self) {
+    pub fn join(self) -> Stats {
         // Ask workers to terminate
         self.master.finalize();
+        self.stats.update(&self.master.stats);
         self.barrier.wait();
 
         // Join workers
         for worker in self.workers {
-            worker.join().unwrap();
+            let worker_stats = worker.join().unwrap();
+            self.stats.update(&worker_stats);
         }
+
+        self.stats
     }
 }
 
@@ -71,7 +78,8 @@ mod tests {
     #[test]
     fn init_and_join() {
         for n in 1..4 {
-            Runtime::init(n).join();
+            let stats = Runtime::init(n).join();
+            assert_eq!(stats.num_tasks_executed.get(), 0);
         }
     }
 }

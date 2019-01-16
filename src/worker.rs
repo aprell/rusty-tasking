@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
 use crate::deque::*;
+use crate::stats::*;
 use crate::task::*;
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ pub struct Worker {
     channels: WorkerChannels,
     coworkers: Vec<Coworker>,
     children: Vec<Sender<Tasks>>,
+    pub stats: Stats,
 }
 
 impl Worker {
@@ -46,6 +48,7 @@ impl Worker {
             channels: WorkerChannels { steal_requests, tasks: channel() },
             coworkers: coworkers.into_iter().filter(|c| c.id != id).collect(),
             children: vec![],
+            stats: Stats::new(),
         };
 
         if id > 0 {
