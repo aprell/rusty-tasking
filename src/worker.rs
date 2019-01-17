@@ -37,6 +37,10 @@ pub struct Worker {
     pub stats: Stats,
 }
 
+thread_local! {
+    static WORKER: RefCell<Option<Worker>> = RefCell::new(None);
+}
+
 impl Worker {
     pub fn new(id: usize,
                steal_requests: Receiver<StealRequest>,
@@ -75,6 +79,29 @@ impl Worker {
         }
 
         worker
+    }
+
+    // Move stack-allocated worker to thread-local storage
+    pub fn make_current(self) {
+        WORKER.with(|worker| {
+            let mut worker = worker.borrow_mut();
+            *worker = Some(self);
+        });
+    }
+
+    // Get a handle to the current worker
+    pub fn current<'a>() -> &'a Worker {
+        WORKER.with(|worker| {
+            // Any attempt of trying to borrow from `worker` and have it
+            // outlive the closure will fail -> `unsafe` to the rescue
+            // (1) Get a raw pointer to thread-local `WORKER`
+            let ptr = match worker.borrow().as_ref() {
+                Some(ref worker) => *worker as *const Worker,
+                None => std::ptr::null(),
+            };
+            // (2) Convert this pointer to a borrowed reference
+            unsafe { std::mem::transmute::<*const _, &'a _>(ptr) }
+        })
     }
 
     pub fn select_victim(&self, id: usize) -> Option<&Coworker> {
@@ -417,5 +444,27 @@ mod tests {
         assert_eq!(get_id(), 0);
         set_id(42);
         assert_eq!(get_id(), 42);
+    }
+
+    #[test]
+    fn current_worker() {
+        let mut workers = Vec::with_capacity(3);
+        let (mut channels, coworkers) = setup(4);
+
+        for i in 0..3 {
+            let channel = channels.remove(1);
+            let coworkers = coworkers.clone();
+            workers.push(thread::spawn(move || {
+                Worker::new(i+1, channel, coworkers).make_current();
+                assert_eq!(Worker::current().id, i+1);
+            }));
+        }
+
+        Worker::new(0, channels.remove(0), coworkers).make_current();
+        assert_eq!(Worker::current().id, 0);
+
+        for worker in workers {
+            worker.join().unwrap();
+        }
     }
 }
