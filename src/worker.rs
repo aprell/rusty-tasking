@@ -29,7 +29,7 @@ struct WorkerChannels {
 }
 
 pub struct Worker {
-    id: usize,
+    pub id: usize,
     deque: RefCell<TaskDeque>,
     channels: WorkerChannels,
     coworkers: Vec<Coworker>,
@@ -193,7 +193,6 @@ impl Worker {
             }
         }
         self.stats.num_tasks_executed.set(num_tasks_executed);
-        self.finalize();
     }
 }
 

@@ -1,12 +1,11 @@
-use rusty_tasking::runtime::{Runtime};
-use rusty_tasking::task::{Async};
+use rusty_tasking::runtime::Runtime;
+use rusty_tasking::task::Async;
 
 #[test]
 fn random_stealing() {
     // Create three additional workers
     let runtime = Runtime::init(4);
-    let master = &runtime.master;
-    let stats = &master.stats;
+    let master = runtime.master;
 
     for _ in 0..999 {
         let task = Async::task(Box::new(|| ()));
@@ -25,7 +24,7 @@ fn random_stealing() {
         }
     }
 
-    stats.num_tasks_executed.set(num_tasks_executed);
+    master.stats.num_tasks_executed.set(num_tasks_executed);
     let stats = runtime.join();
     assert_eq!(stats.num_tasks_executed.get(), 999);
 }
