@@ -53,14 +53,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn update_count() {
-        let s = Stats::new();
+    fn count_up_and_down() {
+        let c = Count::new();
         for i in 1..=10 {
-            s.num_tasks_executed.increment(i);
+            c.increment(i);
         }
-        assert_eq!(s.num_tasks_executed.get(), 55);
-        s.num_tasks_executed.decrement(10);
-        assert_eq!(s.num_tasks_executed.get(), 45);
+        assert_eq!(c.get(), 55);
+        c.decrement(10);
+        assert_eq!(c.get(), 45);
     }
 
     #[test]
