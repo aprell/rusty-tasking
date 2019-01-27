@@ -1,5 +1,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 
+use crate::worker::{Tasks, Worker};
+
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
 // closure that implements `FnMut` may capture variables by reference or
@@ -73,9 +75,51 @@ impl<T> Future<T> {
         self.0.recv().unwrap()
     }
 
+    // pub?
+    fn try_get(&self) -> Option<T> {
+        self.0.try_recv().ok()
+    }
+
     // Try to overlap waiting with useful work
     pub fn wait(self) -> T {
-        unimplemented!();
+        if let Some(val) = self.try_get() {
+            return val;
+        }
+
+        let worker = Worker::current();
+        let mut num_tasks_executed = 0;
+
+        while let Some(task) = worker.pop() {
+            worker.try_handle_steal_request();
+            task.run();
+            num_tasks_executed += 1;
+            if let Some(val) = self.try_get() {
+                worker.stats.num_tasks_executed.increment(num_tasks_executed);
+                return val;
+            }
+        }
+
+        'work_stealing: loop {
+            worker.steal_one();
+            let response = loop {
+                match worker.try_recv_tasks() {
+                    Some(response) => break response,
+                    None => worker.try_handle_steal_request(),
+                }
+            };
+            match response {
+                Tasks::None => (),
+                Tasks::One(task) => {
+                    task.run();
+                    num_tasks_executed += 1;
+                }
+                _ => assert!(false),
+            }
+            if let Some(res) = self.try_get() {
+                worker.stats.num_tasks_executed.increment(num_tasks_executed);
+                return res;
+            }
+        }
     }
 }
 

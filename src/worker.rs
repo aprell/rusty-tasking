@@ -14,7 +14,7 @@ pub struct StealRequest {
 }
 
 // Possible responses to a steal request
-enum Tasks {
+pub enum Tasks {
     None,
     One(Box<Task>),
     Many(TaskDeque),
@@ -208,7 +208,7 @@ impl Worker {
                 }
             }
         }
-        self.stats.num_tasks_executed.set(num_tasks_executed);
+        self.stats.num_tasks_executed.increment(num_tasks_executed);
     }
 }
 

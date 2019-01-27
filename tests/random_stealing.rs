@@ -24,7 +24,7 @@ fn random_stealing() {
         }
     }
 
-    master.stats.num_tasks_executed.set(num_tasks_executed);
+    master.stats.num_tasks_executed.increment(num_tasks_executed);
     let stats = runtime.join();
     assert_eq!(stats.num_tasks_executed.get(), 999);
 }
