@@ -115,6 +115,22 @@ impl Worker {
         victim.send_steal_request(req);
     }
 
+    pub fn steal_one(&self) {
+        self.send_steal_request(StealRequest {
+            thief: self.id,
+            steal_many: false,
+            response: self.channels.tasks.0.clone(),
+        });
+    }
+
+    pub fn steal_many(&self) {
+        self.send_steal_request(StealRequest {
+            thief: self.id,
+            steal_many: true,
+            response: self.channels.tasks.0.clone(),
+        });
+    }
+
     pub fn handle_steal_request(&self, req: StealRequest) {
         let response = req.response;
         if req.steal_many {
@@ -135,6 +151,10 @@ impl Worker {
         if let Ok(req) = req {
             self.handle_steal_request(req);
         }
+    }
+
+    pub fn try_recv_tasks(&self) -> Option<Tasks> {
+        self.channels.tasks.1.try_recv().ok()
     }
 
     pub fn has_tasks(&self) -> bool {
@@ -166,15 +186,11 @@ impl Worker {
                 num_tasks_executed += 1;
             }
             // (2) Request/steal work
-            self.send_steal_request(StealRequest {
-                thief: self.id,
-                steal_many: false,
-                response: self.channels.tasks.0.clone(),
-            });
+            self.steal_one();
             let response = loop {
-                match self.channels.tasks.1.try_recv() {
-                    Ok(response) => break response,
-                    Err(_) => self.try_handle_steal_request(),
+                match self.try_recv_tasks() {
+                    Some(response) => break response,
+                    None => self.try_handle_steal_request(),
                 }
             };
             match response {
