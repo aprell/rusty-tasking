@@ -7,10 +7,29 @@ macro_rules! async_closure {
     ($($body: tt)*) => (Box::new(move || { $($body)* }))
 }
 
+macro_rules! async_task {
+    // `tt` is a token tree
+    ($($body: tt)*) => {
+        let task = Async::task(async_closure! { $($body)* });
+        Worker::current().push(Box::new(task));
+        // No return value
+    }
+}
+
+macro_rules! async_future {
+    // `tt` is a token tree
+    ($($body: tt)*) => {
+        {
+            let (task, future) = Async::future(async_closure! { $($body)* });
+            Worker::current().push(Box::new(task));
+            future
+        }
+    }
+}
+
 fn parfib(n: u64) -> u64 {
     if n < 2 { return n; }
-    let (task, x) = Async::future(async_closure! { parfib(n - 1) });
-    Worker::current().push(Box::new(task));
+    let x = async_future!(parfib(n - 1));
     let y = parfib(n - 2);
     x.wait() + y
 }
