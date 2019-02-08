@@ -4,6 +4,7 @@ macro_rules! async_closure {
     ($($body: tt)*) => (Box::new(move || { $($body)* }))
 }
 
+#[macro_export]
 macro_rules! async_task {
     // `tt` is a token tree
     ($($body: tt)*) => {

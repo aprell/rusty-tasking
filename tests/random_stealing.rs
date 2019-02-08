@@ -1,5 +1,9 @@
+#[macro_use]
+extern crate rusty_tasking;
+
 use rusty_tasking::runtime::Runtime;
 use rusty_tasking::task::Async;
+use rusty_tasking::worker::Worker;
 
 #[test]
 fn random_stealing() {
@@ -8,8 +12,7 @@ fn random_stealing() {
     let master = runtime.master;
 
     for _ in 0..999 {
-        let task = Async::task(Box::new(|| ()));
-        master.push(Box::new(task));
+        async_task!();
     }
 
     let mut num_tasks_executed = 0;
