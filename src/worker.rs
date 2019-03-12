@@ -115,20 +115,22 @@ impl Worker {
         victim.send_steal_request(req);
     }
 
-    pub fn steal_one(&self) {
+    pub fn steal_one(&self) -> FutureTasks {
         self.send_steal_request(StealRequest {
             thief: self.id,
             steal_many: false,
             response: self.channels.tasks.0.clone(),
         });
+        FutureTasks(&self.channels.tasks.1)
     }
 
-    pub fn steal_many(&self) {
+    pub fn steal_many(&self) -> FutureTasks {
         self.send_steal_request(StealRequest {
             thief: self.id,
             steal_many: true,
             response: self.channels.tasks.0.clone(),
         });
+        FutureTasks(&self.channels.tasks.1)
     }
 
     pub fn handle_steal_request(&self, req: StealRequest) {
@@ -151,10 +153,6 @@ impl Worker {
         if let Ok(req) = req {
             self.handle_steal_request(req);
         }
-    }
-
-    pub fn try_recv_tasks(&self) -> Option<Tasks> {
-        self.channels.tasks.1.try_recv().ok()
     }
 
     pub fn has_tasks(&self) -> bool {
@@ -186,14 +184,7 @@ impl Worker {
                 num_tasks_executed += 1;
             }
             // (2) Request/steal work
-            self.steal_one();
-            let response = loop {
-                match self.try_recv_tasks() {
-                    Some(response) => break response,
-                    None => self.try_handle_steal_request(),
-                }
-            };
-            match response {
+            match self.steal_one().wait() {
                 Tasks::None => (),
                 Tasks::One(task) => {
                     task.run();
@@ -234,6 +225,21 @@ impl Clone for Coworker {
         Coworker {
             id: self.id,
             steal_requests: Sender::clone(&self.steal_requests),
+        }
+    }
+}
+
+// The result of asynchronous work stealing
+pub struct FutureTasks<'a>(&'a Receiver<Tasks>);
+
+impl<'a> FutureTasks<'a> {
+    pub fn wait(self) -> Tasks {
+        let worker = Worker::current();
+        loop {
+            match self.0.try_recv().ok() {
+                Some(tasks) => break tasks,
+                None => worker.try_handle_steal_request(),
+            }
         }
     }
 }

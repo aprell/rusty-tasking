@@ -100,14 +100,7 @@ impl<T> Future<T> {
         }
 
         'work_stealing: loop {
-            worker.steal_one();
-            let response = loop {
-                match worker.try_recv_tasks() {
-                    Some(response) => break response,
-                    None => worker.try_handle_steal_request(),
-                }
-            };
-            match response {
+            match worker.steal_one().wait() {
                 Tasks::None => (),
                 Tasks::One(task) => {
                     task.run();
