@@ -41,9 +41,8 @@ impl<T> Async<T> {
 
     pub fn run(mut self) {
         let result = (self.task)();
-        match self.promise {
-            Some(promise) => promise.set(result),
-            None => (),
+        if let Some(promise) = self.promise {
+            promise.set(result)
         }
     }
 }
@@ -99,14 +98,14 @@ impl<T> Future<T> {
             }
         }
 
-        'work_stealing: loop {
+        loop {
             match worker.steal_one().wait() {
                 Tasks::None => (),
                 Tasks::One(task) => {
                     task.run();
                     num_tasks_executed += 1;
                 }
-                _ => assert!(false),
+                _ => panic!(),
             }
             if let Some(res) = self.try_get() {
                 worker.stats.num_tasks_executed.increment(num_tasks_executed);

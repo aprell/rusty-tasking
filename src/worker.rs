@@ -58,7 +58,7 @@ impl Worker {
         if id > 0 {
             // Determine parent and send a dummy steal request
             let parent_id = (id - 1) / 2;
-            let ref parent = worker.coworkers[parent_id];
+            let parent = &worker.coworkers[parent_id];
             parent.send_steal_request(StealRequest {
                 thief: id,
                 steal_many: false,
@@ -100,7 +100,7 @@ impl Worker {
                 None => std::ptr::null(),
             };
             // (2) Convert this pointer to a borrowed reference
-            unsafe { std::mem::transmute::<*const _, &'a _>(ptr) }
+            unsafe { &*ptr }
         })
     }
 
@@ -111,7 +111,7 @@ impl Worker {
     // Send steal request to random worker != self
     pub fn send_steal_request(&self, req: StealRequest) {
         let rand_idx: usize = rand::thread_rng().gen_range(0, self.coworkers.len());
-        let ref victim = self.coworkers[rand_idx];
+        let victim = &self.coworkers[rand_idx];
         victim.send_steal_request(req);
     }
 
