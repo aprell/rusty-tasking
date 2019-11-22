@@ -17,7 +17,7 @@ on, after some progress on my own.
 
 <!-- Links -->
 
-[1]: https://epub.uni-bayreuth.de/2990
+[1]: https://github.com/aprell/tasking-2.0
 [2]: https://crates.io/crates/threadpool
 [3]: https://crates.io/crates/crossbeam
 [4]: https://crates.io/crates/rayon
