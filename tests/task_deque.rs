@@ -2,7 +2,7 @@ use rusty_tasking::deque::{Deque, Steal, StealMany};
 use rusty_tasking::task::{Async, Future, Task, Thunk};
 use std::thread;
 
-type TaskDeque = Deque<Box<Task>>;
+type TaskDeque = Deque<Box<dyn Task>>;
 
 fn future<T>(thunk: Box<Thunk<T>>, deque: &mut TaskDeque) -> Future<T>
 where T: Send + 'static

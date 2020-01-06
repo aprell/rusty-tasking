@@ -10,7 +10,7 @@ use crate::worker::{Tasks, Worker};
 // From TRPL: "[...] we need `Send` to transfer the closure from one thread to
 // another and `'static` (a lifetime bound) because we don’t know how long the
 // thread will take to execute."
-pub type Thunk<T> = FnMut() -> T + Send + 'static;
+pub type Thunk<T> = dyn FnMut() -> T + Send + 'static;
 
 // `Send` is a supertrait of `Task`, which means that only those task types
 // that can be sent between threads safely are allowed to implement `Task`.
@@ -183,7 +183,7 @@ mod tests {
         let c = SimpleTask::new(Box::new(|| 1.2));
 
         // A vector of unboxed trait objects
-        let mut v: Vec<&Task> = vec![&a, &b, &c];
+        let mut v: Vec<&dyn Task> = vec![&a, &b, &c];
 
         while let Some(_t) = v.pop() {
             // `_t` has type `&Task`
@@ -199,7 +199,7 @@ mod tests {
         let c = SimpleTask::new(Box::new(|| 1.2));
 
         // A vector of boxed trait objects
-        let mut v: Vec<Box<Task>> = vec![
+        let mut v: Vec<Box<dyn Task>> = vec![
             Box::new(a),
             Box::new(b),
             Box::new(c),

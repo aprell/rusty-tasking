@@ -16,12 +16,12 @@ pub struct StealRequest {
 // Possible responses to a steal request
 pub enum Tasks {
     None,
-    One(Box<Task>),
+    One(Box<dyn Task>),
     Many(TaskDeque),
     Exit,
 }
 
-type TaskDeque = Deque<Box<Task>>;
+type TaskDeque = Deque<Box<dyn Task>>;
 
 struct WorkerChannels {
     steal_requests: Receiver<StealRequest>,
@@ -159,11 +159,11 @@ impl Worker {
         !self.deque.borrow_mut().is_empty()
     }
 
-    pub fn push(&self, task: Box<Task>) {
+    pub fn push(&self, task: Box<dyn Task>) {
         self.deque.borrow_mut().push(task);
     }
 
-    pub fn pop(&self) -> Option<Box<Task>> {
+    pub fn pop(&self) -> Option<Box<dyn Task>> {
         self.deque.borrow_mut().pop()
     }
 
