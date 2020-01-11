@@ -1,6 +1,6 @@
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::channel;
 
-use crate::worker::{Tasks, Worker};
+use crate::future::{Future, Promise};
 
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
@@ -61,65 +61,6 @@ impl<T> fmt::Debug for Async<T> {
 impl<T> Task for Async<T> where T: Send {
     fn run(self: Box<Async<T>>) {
         (*self).run();
-    }
-}
-
-// Futures and promises
-
-pub struct Future<T>(Receiver<T>);
-
-impl<T> Future<T> {
-    // Block until result is available
-    pub fn get(self) -> T {
-        self.0.recv().unwrap()
-    }
-
-    // pub?
-    fn try_get(&self) -> Option<T> {
-        self.0.try_recv().ok()
-    }
-
-    // Try to overlap waiting with useful work
-    pub fn wait(self) -> T {
-        if let Some(val) = self.try_get() {
-            return val;
-        }
-
-        let worker = Worker::current();
-        let mut num_tasks_executed = 0;
-
-        while let Some(task) = worker.pop() {
-            worker.try_handle_steal_request();
-            task.run();
-            num_tasks_executed += 1;
-            if let Some(val) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
-                return val;
-            }
-        }
-
-        loop {
-            match worker.steal_one().wait() {
-                Tasks::None => (),
-                Tasks::One(task) => {
-                    task.run();
-                    num_tasks_executed += 1;
-                }
-                _ => panic!(),
-            }
-            if let Some(res) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
-                return res;
-            }
-        }
-    }
-}
-
-pub struct Promise<T>(Sender<T>);
-
-impl<T> Promise<T> {
-    pub fn set(self, result: T) {
-        self.0.send(result).unwrap();
     }
 }
 
@@ -209,29 +150,6 @@ mod tests {
             // `t` has type `Box<Task>`, which can be moved into `run`
             t.run();
         }
-    }
-
-    #[test]
-    fn future_promise() {
-        let (sender, receiver) = channel();
-        Promise(sender).set(1);
-        assert_eq!(Future(receiver).get(), 1);
-    }
-
-    #[test]
-    fn future_promise_thread() {
-        let (sender1, receiver1) = channel();
-
-        let t = thread::spawn(|| {
-            let (sender2, receiver2) = channel();
-            Promise(sender1).set(("ping", Promise(sender2)));
-            assert_eq!(Future(receiver2).get(), "pong");
-        });
-
-        let (msg, promise) = Future(receiver1).get();
-        assert_eq!(msg, "ping");
-        promise.set("pong");
-        t.join().unwrap();
     }
 
     #[test]

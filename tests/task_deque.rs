@@ -1,5 +1,6 @@
 use rusty_tasking::deque::{Deque, Steal, StealMany};
-use rusty_tasking::task::{Async, Future, Task, Thunk};
+use rusty_tasking::future::Future;
+use rusty_tasking::task::{Async, Task, Thunk};
 use std::thread;
 
 type TaskDeque = Deque<Box<dyn Task>>;
