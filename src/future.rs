@@ -64,12 +64,12 @@ impl<T> Promise<T> {
 
 pub enum LazyFuture<T> {
     Lazy(Option<T>),
-    Eager(Future<T>),
+    Chan(Future<T>),
 }
 
 pub enum LazyPromise<T> {
     Lazy(*mut LazyFuture<T>),
-    Eager(Promise<T>),
+    Chan(Promise<T>),
 }
 
 // Rustonomicon: "Raw pointers are neither `Send` nor `Sync` (because they
@@ -90,14 +90,14 @@ impl<T> LazyFuture<T> {
     pub fn get(self) -> T {
         match self {
             LazyFuture::Lazy(opt) => opt.unwrap(),
-            LazyFuture::Eager(fut) => fut.get(),
+            LazyFuture::Chan(fut) => fut.get(),
         }
     }
 
     fn try_get(&mut self) -> Option<T> {
         match self {
             LazyFuture::Lazy(opt) => opt.take(),
-            LazyFuture::Eager(fut) => fut.try_get(),
+            LazyFuture::Chan(fut) => fut.try_get(),
         }
     }
 
@@ -148,14 +148,14 @@ impl<T> LazyPromise<T> {
         let (sender, receiver) = channel();
         match self {
             LazyPromise::Lazy(fut) => unsafe {
-                *fut = LazyFuture::Eager(Future(receiver));
+                *fut = LazyFuture::Chan(Future(receiver));
             }
-            LazyPromise::Eager(_) => {
+            LazyPromise::Chan(_) => {
                 // Something went wrong
                 panic!();
             }
         }
-        LazyPromise::Eager(Promise(sender))
+        LazyPromise::Chan(Promise(sender))
     }
 
     pub fn set(self, value: T) {
@@ -166,13 +166,13 @@ impl<T> LazyPromise<T> {
                         assert!(opt.is_none());
                         *opt = Some(value);
                     }
-                    LazyFuture::Eager(_) => {
+                    LazyFuture::Chan(_) => {
                         // Something went wrong
                         panic!();
                     }
                 }
             }
-            LazyPromise::Eager(fut) => {
+            LazyPromise::Chan(fut) => {
                 fut.set(value);
             }
         }
