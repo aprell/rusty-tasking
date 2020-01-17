@@ -7,7 +7,7 @@ use rusty_tasking::worker::Worker;
 
 fn parfib(n: u64) -> u64 {
     if n < 2 { return n; }
-    let x = async_future!(parfib(n - 1));
+    let mut x = async_future!(parfib(n - 1));
     let y = parfib(n - 2);
     x.wait() + y
 }

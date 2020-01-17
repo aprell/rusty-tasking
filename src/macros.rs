@@ -77,7 +77,7 @@ mod tests {
     fn async_futures() {
         let runtime = Runtime::init(3);
 
-        let n = async_future!(sum(10));
+        let mut n = async_future!(sum(10));
         assert_eq!(n.wait(), 55);
 
         let stats = runtime.join();

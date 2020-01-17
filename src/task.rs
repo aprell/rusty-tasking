@@ -35,8 +35,8 @@ impl<T> Async<T> {
     // Constructor for tasks with return values
     pub fn future(task: Box<Thunk<T>>) -> (Async<T>, Future<T>)  {
         let (sender, receiver) = channel();
-        let promise = Some(Promise(sender));
-        (Async { task, promise }, Future(receiver))
+        let promise = Some(Promise::Chan(sender));
+        (Async { task, promise }, Future::Chan(receiver))
     }
 
     pub fn run(mut self) {

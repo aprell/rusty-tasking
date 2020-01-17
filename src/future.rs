@@ -4,72 +4,14 @@ use crate::worker::{Tasks, Worker};
 
 // Futures and promises
 
-pub struct Future<T>(pub Receiver<T>);
-
-pub struct Promise<T>(pub Sender<T>);
-
-impl<T> Future<T> {
-    // Block until result is available
-    pub fn get(self) -> T {
-        self.0.recv().unwrap()
-    }
-
-    fn try_get(&mut self) -> Option<T> {
-        self.0.try_recv().ok()
-    }
-
-    // Try to overlap waiting with useful work
-    pub fn wait(mut self) -> T {
-        if let Some(val) = self.try_get() {
-            return val;
-        }
-
-        let worker = Worker::current();
-        let mut num_tasks_executed = 0;
-
-        while let Some(task) = worker.pop() {
-            worker.try_handle_steal_request();
-            task.run();
-            num_tasks_executed += 1;
-            if let Some(val) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
-                return val;
-            }
-        }
-
-        loop {
-            match worker.steal_one().wait() {
-                Tasks::None => (),
-                Tasks::One(task) => {
-                    task.run();
-                    num_tasks_executed += 1;
-                }
-                _ => panic!(),
-            }
-            if let Some(res) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
-                return res;
-            }
-        }
-    }
-}
-
-impl<T> Promise<T> {
-    pub fn set(self, value: T) {
-        self.0.send(value).unwrap();
-    }
-}
-
-// Lazy allocation
-
-pub enum LazyFuture<T> {
+pub enum Future<T> {
     Lazy(Option<T>),
-    Chan(Future<T>),
+    Chan(Receiver<T>),
 }
 
-pub enum LazyPromise<T> {
-    Lazy(*mut LazyFuture<T>),
-    Chan(Promise<T>),
+pub enum Promise<T> {
+    Lazy(*mut Future<T>),
+    Chan(Sender<T>),
 }
 
 // Rustonomicon: "Raw pointers are neither `Send` nor `Sync` (because they
@@ -78,26 +20,23 @@ pub enum LazyPromise<T> {
 // thread-safe. (...) Types that aren't automatically derived can simply
 // implement them if desired."
 //
-// A `LazyPromise` is sendable after promotion to a `Promise`
-unsafe impl<T> Send for LazyPromise<T> {}
+// A `Promise` is sendable after it is promoted to a `Sender`
+unsafe impl<T> Send for Promise<T> {}
 
-impl<T> LazyFuture<T> {
-    pub fn new() -> LazyFuture<T> {
-        LazyFuture::Lazy(None)
-    }
-
+impl<T> Future<T> {
     // Block until result is available
     pub fn get(self) -> T {
         match self {
-            LazyFuture::Lazy(opt) => opt.unwrap(),
-            LazyFuture::Chan(fut) => fut.get(),
+            // Panic if opt.is_none() (better than waiting forever)
+            Future::Lazy(opt) => opt.unwrap(),
+            Future::Chan(chan) => chan.recv().unwrap(),
         }
     }
 
     fn try_get(&mut self) -> Option<T> {
         match self {
-            LazyFuture::Lazy(opt) => opt.take(),
-            LazyFuture::Chan(fut) => fut.try_get(),
+            Future::Lazy(opt) => opt.take(),
+            Future::Chan(chan) => chan.try_recv().ok(),
         }
     }
 
@@ -139,41 +78,38 @@ impl<T> LazyFuture<T> {
     }
 }
 
-impl<T> LazyPromise<T> {
-    pub fn new(future: &mut LazyFuture<T>) -> LazyPromise<T> {
-        LazyPromise::Lazy(future)
-    }
-
-    pub fn promote(self) -> LazyPromise<T> {
+impl<T> Promise<T> {
+    pub fn promote(self) -> Promise<T> {
         let (sender, receiver) = channel();
         match self {
-            LazyPromise::Lazy(fut) => unsafe {
-                *fut = LazyFuture::Chan(Future(receiver));
+            Promise::Lazy(fut) => unsafe {
+                *fut = Future::Chan(receiver);
             }
-            LazyPromise::Chan(_) => {
+            Promise::Chan(_) => {
                 // Something went wrong
                 panic!();
             }
         }
-        LazyPromise::Chan(Promise(sender))
+        Promise::Chan(sender)
     }
 
     pub fn set(self, value: T) {
         match self {
-            LazyPromise::Lazy(fut) => unsafe {
+            Promise::Lazy(fut) => unsafe {
                 match *fut {
-                    LazyFuture::Lazy(ref mut opt) => {
+                    Future::Lazy(ref mut opt) => {
                         assert!(opt.is_none());
                         *opt = Some(value);
                     }
-                    LazyFuture::Chan(_) => {
+                    Future::Chan(_) => {
                         // Something went wrong
                         panic!();
                     }
                 }
             }
-            LazyPromise::Chan(fut) => {
-                fut.set(value);
+
+            Promise::Chan(chan) => {
+                chan.send(value).unwrap();
             }
         }
     }
@@ -188,14 +124,14 @@ mod tests {
     #[test]
     fn future_promise() {
         let (sender, receiver) = channel();
-        Promise(sender).set(1);
-        assert_eq!(Future(receiver).get(), 1);
+        Promise::Chan(sender).set(1);
+        assert_eq!(Future::Chan(receiver).get(), 1);
     }
 
     #[test]
     fn future_promise_lazy() {
-        let mut f = LazyFuture::new();
-        let p = LazyPromise::new(&mut f);
+        let mut f = Future::Lazy(None);
+        let p = Promise::Lazy(&mut f);
         p.set(1);
         assert_eq!(f.get(), 1);
     }
@@ -206,11 +142,11 @@ mod tests {
 
         let t = thread::spawn(|| {
             let (sender2, receiver2) = channel();
-            Promise(sender1).set(("ping", Promise(sender2)));
-            assert_eq!(Future(receiver2).get(), "pong");
+            Promise::Chan(sender1).set(("ping", Promise::Chan(sender2)));
+            assert_eq!(Future::Chan(receiver2).get(), "pong");
         });
 
-        let (msg, promise) = Future(receiver1).get();
+        let (msg, promise) = Future::Chan(receiver1).get();
         assert_eq!(msg, "ping");
         promise.set("pong");
         t.join().unwrap();
@@ -218,12 +154,12 @@ mod tests {
 
     #[test]
     fn future_promise_thread_lazy() {
-        let mut f1 = LazyFuture::new();
-        let p1 = LazyPromise::new(&mut f1).promote();
+        let mut f1 = Future::Lazy(None);
+        let p1 = Promise::Lazy(&mut f1).promote();
 
         let t = thread::spawn(|| {
-            let mut f2 = LazyFuture::new();
-            let p2 = LazyPromise::new(&mut f2).promote();
+            let mut f2 = Future::Lazy(None);
+            let p2 = Promise::Lazy(&mut f2).promote();
             p1.set(("ping", p2));
             assert_eq!(f2.get(), "pong");
         });
