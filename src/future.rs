@@ -80,17 +80,14 @@ impl<T> Future<T> {
 
 impl<T> Promise<T> {
     pub fn promote(&mut self) {
-        let (sender, receiver) = channel();
         match *self {
-            Promise::Lazy(fut) => unsafe {
-                *fut = Future::Chan(receiver);
-            }
-            Promise::Chan(_) => {
-                // Something went wrong
-                panic!();
-            }
+            Promise::Lazy(fut) => {
+                let (sender, receiver) = channel();
+                unsafe { *fut = Future::Chan(receiver); }
+                *self = Promise::Chan(sender);
+            },
+            Promise::Chan(_) => (),
         }
-        *self = Promise::Chan(sender);
     }
 
     pub fn set(self, value: T) {
