@@ -79,9 +79,9 @@ impl<T> Future<T> {
 }
 
 impl<T> Promise<T> {
-    pub fn promote(self) -> Promise<T> {
+    pub fn promote(&mut self) {
         let (sender, receiver) = channel();
-        match self {
+        match *self {
             Promise::Lazy(fut) => unsafe {
                 *fut = Future::Chan(receiver);
             }
@@ -90,7 +90,7 @@ impl<T> Promise<T> {
                 panic!();
             }
         }
-        Promise::Chan(sender)
+        *self = Promise::Chan(sender);
     }
 
     pub fn set(self, value: T) {
@@ -155,11 +155,13 @@ mod tests {
     #[test]
     fn future_promise_thread_lazy() {
         let mut f1 = Future::Lazy(None);
-        let p1 = Promise::Lazy(&mut f1).promote();
+        let mut p1 = Promise::Lazy(&mut f1);
+        p1.promote();
 
         let t = thread::spawn(|| {
             let mut f2 = Future::Lazy(None);
-            let p2 = Promise::Lazy(&mut f2).promote();
+            let mut p2 = Promise::Lazy(&mut f2);
+            p2.promote();
             p1.set(("ping", p2));
             assert_eq!(f2.get(), "pong");
         });
