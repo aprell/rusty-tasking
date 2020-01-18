@@ -13,7 +13,8 @@ pub trait StealMany<T>: Steal<T> {
 }
 
 // See newtype pattern
-pub struct Deque<T>(VecDeque<T>);
+// TODO: Make Deque iterable
+pub struct Deque<T>(pub VecDeque<T>);
 
 impl<T> Deque<T> {
     pub fn new() -> Deque<T> {

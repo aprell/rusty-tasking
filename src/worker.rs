@@ -137,12 +137,21 @@ impl Worker {
         let response = req.response;
         if req.steal_many {
             match self.deque.borrow_mut().steal_many() {
-                Some(tasks) => response.send(Tasks::Many(tasks)).unwrap(),
+                // Holy smoke... FIXME please
+                Some(mut tasks) => {
+                    for ref mut task in &mut tasks.0 {
+                        task.promote();
+                    }
+                    response.send(Tasks::Many(tasks)).unwrap();
+                },
                 None => response.send(Tasks::None).unwrap(),
             }
         } else {
             match self.deque.borrow_mut().steal() {
-                Some(task) => response.send(Tasks::One(task)).unwrap(),
+                Some(mut task) => {
+                    task.promote();
+                    response.send(Tasks::One(task)).unwrap();
+                },
                 None => response.send(Tasks::None).unwrap(),
             }
         }

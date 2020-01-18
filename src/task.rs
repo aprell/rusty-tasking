@@ -16,6 +16,7 @@ pub type Thunk<T> = dyn FnMut() -> T + Send + 'static;
 // that can be sent between threads safely are allowed to implement `Task`.
 pub trait Task: Send {
     fn run(self: Box<Self>);
+    fn promote(&mut self);
 }
 
 // A task with return type `T`
@@ -45,6 +46,12 @@ impl<T> Async<T> {
             promise.set(result)
         }
     }
+
+    pub fn promote(&mut self) {
+        if let Some(ref mut promise) = self.promise {
+            promise.promote();
+        }
+    }
 }
 
 use std::fmt;
@@ -61,6 +68,10 @@ impl<T> fmt::Debug for Async<T> {
 impl<T> Task for Async<T> where T: Send {
     fn run(self: Box<Async<T>>) {
         (*self).run();
+    }
+
+    fn promote(&mut self) {
+        (*self).promote();
     }
 }
 
@@ -90,6 +101,8 @@ mod tests {
             // Ignore result
             let _ = (*self).0();
         }
+
+        fn promote(&mut self) {}
     }
 
     #[test]
