@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::collections::vec_deque::{Iter, IterMut};
 
 pub trait Steal<T> {
     fn steal(&mut self) -> Option<T>;
@@ -13,8 +14,7 @@ pub trait StealMany<T>: Steal<T> {
 }
 
 // See newtype pattern
-// TODO: Make Deque iterable
-pub struct Deque<T>(pub VecDeque<T>);
+pub struct Deque<T>(VecDeque<T>);
 
 impl<T> Deque<T> {
     pub fn new() -> Deque<T> {
@@ -35,6 +35,14 @@ impl<T> Deque<T> {
 
     pub fn append(&mut self, other: &mut VecDeque<T>) {
         self.0.append(other);
+    }
+
+    pub fn iter(&self) -> Iter<T> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        self.0.iter_mut()
     }
 }
 

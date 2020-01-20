@@ -104,7 +104,6 @@ impl<T> Promise<T> {
                     }
                 }
             }
-
             Promise::Chan(chan) => {
                 chan.send(value).unwrap();
             }

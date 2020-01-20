@@ -137,9 +137,8 @@ impl Worker {
         let response = req.response;
         if req.steal_many {
             match self.deque.borrow_mut().steal_many() {
-                // Holy smoke... FIXME please
                 Some(mut tasks) => {
-                    for ref mut task in &mut tasks.0 {
+                    for task in tasks.iter_mut() {
                         task.promote();
                     }
                     response.send(Tasks::Many(tasks)).unwrap();
