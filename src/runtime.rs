@@ -1,9 +1,8 @@
+use crate::stats::*;
+use crate::worker::*;
 use std::sync::{Arc, Barrier, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
-
-use crate::stats::*;
-use crate::worker::*;
 
 pub struct Runtime {
     pub master: &'static Worker,

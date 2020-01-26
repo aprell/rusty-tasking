@@ -1,4 +1,5 @@
 use crate::future::Promise;
+use std::fmt;
 
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
@@ -42,8 +43,6 @@ impl<T> Async<T> {
         }
     }
 }
-
-use std::fmt;
 
 impl<T> fmt::Debug for Async<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

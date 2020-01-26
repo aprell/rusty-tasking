@@ -1,10 +1,9 @@
-use rand::Rng;
-use std::cell::RefCell;
-use std::sync::mpsc::{channel, Sender, Receiver};
-
 use crate::deque::*;
 use crate::stats::*;
 use crate::task::*;
+use rand::Rng;
+use std::cell::RefCell;
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 #[derive(Debug)]
 pub struct StealRequest {

@@ -1,6 +1,5 @@
-use std::sync::mpsc::{channel, Sender, Receiver};
-
 use crate::worker::{Tasks, Worker};
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 // Futures and promises
 
@@ -137,7 +136,6 @@ impl<T> ToPromise<T> for &mut Future<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc::channel;
     use std::thread;
     use super::*;
 
