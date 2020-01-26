@@ -1,6 +1,4 @@
-use std::sync::mpsc::Sender;
-
-use crate::future::{Future, Promise};
+use crate::future::Promise;
 
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
@@ -25,22 +23,10 @@ pub struct Async<T> {
     promise: Option<Promise<T>>,
 }
 
-impl Async<()> {
-    // Constructor for tasks without return values (cannot overload `new`)
-    pub fn task(task: Box<Thunk<()>>) -> Async<()> {
-        Async { task, promise: None }
-    }
-}
-
 impl<T> Async<T> {
-    // Constructor for tasks with return values
-    pub fn future(task: Box<Thunk<T>>, future: &mut Future<T>) -> Async<T> {
-        Async { task, promise: Some(Promise::Lazy(future)) }
-    }
-
-    // Constructor for tasks with return values
-    pub fn promise(task: Box<Thunk<T>>, sender: Sender<T>) -> Async<T> {
-        Async { task, promise: Some(Promise::Chan(sender)) }
+    // Constructor for tasks with and without return values
+    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> Async<T> {
+        Async { task, promise }
     }
 
     pub fn run(mut self) {
@@ -80,6 +66,7 @@ impl<T> Task for Async<T> where T: Send {
 
 #[cfg(test)]
 mod tests {
+    use crate::future::{Future, ToPromise};
     use std::sync::mpsc::channel;
     use std::thread;
     use super::*;
@@ -171,7 +158,7 @@ mod tests {
 
     #[test]
     fn async_task() {
-        let a = Async::task(Box::new(|| ()));
+        let a = Async::new(Box::new(|| ()), None);
         a.run();
         // `a` has been consumed
     }
@@ -179,7 +166,7 @@ mod tests {
     #[test]
     fn async_future() {
         let (sender, receiver) = channel();
-        let a = Async::promise(Box::new(|| 3.14), sender);
+        let a = Async::new(Box::new(|| 3.14), sender.to_promise());
         a.run();
         // `a` has been consumed
         assert_eq!(Future::Chan(receiver).get(), 3.14);
@@ -188,7 +175,7 @@ mod tests {
     #[test]
     fn async_future_lazy() {
         let mut f = Future::Lazy(None);
-        let a = Async::future(Box::new(|| 3.14), &mut f);
+        let a = Async::new(Box::new(|| 3.14), (&mut f).to_promise());
         a.run();
         // `a` has been consumed
         assert_eq!(f.get(), 3.14);
@@ -197,7 +184,7 @@ mod tests {
     #[test]
     fn async_future_to_thread() {
         let (sender, receiver) = channel();
-        let a = Async::promise(Box::new(|| "hi"), sender);
+        let a = Async::new(Box::new(|| "hi"), sender.to_promise());
         let t = thread::spawn(|| a.run());
         assert_eq!(Future::Chan(receiver).get(), "hi");
         t.join().unwrap();
@@ -206,7 +193,7 @@ mod tests {
     #[test]
     fn async_future_to_thread_lazy() {
         let mut f = Future::Lazy(None);
-        let mut a = Async::future(Box::new(|| "hi"), &mut f);
+        let mut a = Async::new(Box::new(|| "hi"), (&mut f).to_promise());
         a.promote();
         let t = thread::spawn(|| a.run());
         t.join().unwrap();

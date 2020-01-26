@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rusty_tasking;
 
+use rusty_tasking::future::ToPromise;
 use rusty_tasking::runtime::Runtime;
 use rusty_tasking::task::Async;
 use rusty_tasking::worker::Worker;

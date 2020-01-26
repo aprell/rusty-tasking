@@ -375,7 +375,7 @@ mod tests {
 
         // Create a few dummy tasks
         for _ in 0..10 {
-            let task = Async::task(Box::new(|| ()));
+            let task = Async::new(Box::new(|| ()), None);
             master.push(Box::new(task));
         }
 
@@ -434,7 +434,7 @@ mod tests {
                     // steal requests
                     2 => {
                         for _ in 0..10 {
-                            let task = Async::task(Box::new(|| ()));
+                            let task = Async::new(Box::new(|| ()), None);
                             worker.push(Box::new(task));
                         }
                         while worker.has_tasks() {

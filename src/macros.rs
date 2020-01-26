@@ -11,7 +11,7 @@ macro_rules! spawn {
         {
             // $i is supposed to be `channel`
             let (sender, receiver) = $i();
-            let task = Async::promise(async_closure! { $($body)* }, sender);
+            let task = Async::new(async_closure! { $($body)* }, sender.to_promise());
             Worker::current().push(Box::new(task));
             Future::Chan(receiver)
         }
@@ -19,7 +19,7 @@ macro_rules! spawn {
 
     ($e: expr, $($body: tt)*) => {
         {
-            let task = Async::future(async_closure! { $($body)* }, $e);
+            let task = Async::new(async_closure! { $($body)* }, $e.to_promise());
             Worker::current().push(Box::new(task));
             $e
         }
@@ -27,7 +27,7 @@ macro_rules! spawn {
 
     ($($body: tt)*) => {
         {
-            let task = Async::task(async_closure! { $($body)* });
+            let task = Async::new(async_closure! { $($body)* }, ().to_promise());
             Worker::current().push(Box::new(task));
             // No return value
         }
@@ -36,7 +36,7 @@ macro_rules! spawn {
 
 #[cfg(test)]
 mod tests {
-    use crate::future::Future;
+    use crate::future::{Future, ToPromise};
     use crate::runtime::Runtime;
     use crate::task::Async;
     use crate::worker::Worker;

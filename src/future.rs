@@ -111,6 +111,30 @@ impl<T> Promise<T> {
     }
 }
 
+// The types that can be used to construct a promise
+
+pub trait ToPromise<T> {
+    fn to_promise(self) -> Option<Promise<T>>;
+}
+
+impl<T> ToPromise<T> for () {
+    fn to_promise(self) -> Option<Promise<T>> {
+        None
+    }
+}
+
+impl<T> ToPromise<T> for Sender<T> {
+    fn to_promise(self) -> Option<Promise<T>> {
+        Some(Promise::Chan(self))
+    }
+}
+
+impl<T> ToPromise<T> for &mut Future<T> {
+    fn to_promise(self) -> Option<Promise<T>> {
+        Some(Promise::Lazy(self))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::mpsc::channel;
