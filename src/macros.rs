@@ -27,7 +27,7 @@ macro_rules! spawn {
 
     ($($body: tt)*) => {
         {
-            let task = Async::new(async_closure! { $($body)* }, ().to_promise());
+            let task = Async::new(async_closure! { $($body)* }, None);
             Worker::current().push(Box::new(task));
             // No return value
         }
