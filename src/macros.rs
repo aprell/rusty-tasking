@@ -40,7 +40,6 @@ mod tests {
     use crate::runtime::Runtime;
     use crate::task::Async;
     use crate::worker::Worker;
-    use std::sync::mpsc::channel;
 
     #[test]
     fn async_tasks() {
@@ -80,14 +79,19 @@ mod tests {
     }
 
     fn sum(n: u32) -> u32 {
-        if n <= 1 { n } else { n + spawn!(channel, sum(n - 1)).wait() }
+        if n <= 1 { n }
+        else {
+            let mut f = Future::Lazy(None);
+            n + spawn!(&mut f, sum(n - 1)).wait()
+        }
     }
 
     #[test]
     fn async_futures() {
         let runtime = Runtime::init(3);
 
-        let mut n = spawn!(channel, sum(10));
+        let mut n = Future::Lazy(None);
+        let _ = spawn!(&mut n, sum(10));
         assert_eq!(n.wait(), 55);
 
         let stats = runtime.join();

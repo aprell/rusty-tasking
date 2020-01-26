@@ -5,11 +5,11 @@ use rusty_tasking::future::{Future, ToPromise};
 use rusty_tasking::runtime::Runtime;
 use rusty_tasking::task::Async;
 use rusty_tasking::worker::Worker;
-use std::sync::mpsc::channel;
 
 fn parfib(n: u64) -> u64 {
     if n < 2 { return n; }
-    let mut x = spawn!(channel, parfib(n - 1));
+    let mut x = Future::Lazy(None);
+    let _ = spawn!(&mut x, parfib(n - 1));
     let y = parfib(n - 2);
     x.wait() + y
 }
