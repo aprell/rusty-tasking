@@ -12,7 +12,7 @@ fn random_stealing() {
     let master = runtime.master;
 
     for _ in 0..999 {
-        async_task!();
+        spawn!();
     }
 
     let mut num_tasks_executed = 0;

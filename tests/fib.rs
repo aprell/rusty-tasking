@@ -9,7 +9,7 @@ use std::sync::mpsc::channel;
 
 fn parfib(n: u64) -> u64 {
     if n < 2 { return n; }
-    let mut x = async_future!(parfib(n - 1));
+    let mut x = spawn!(channel, parfib(n - 1));
     let y = parfib(n - 2);
     x.wait() + y
 }

@@ -5,19 +5,19 @@ macro_rules! async_closure {
 }
 
 #[macro_export]
-macro_rules! async_task {
+macro_rules! spawn {
     // `tt` is a token tree
-    ($($body: tt)*) => {
-        let task = Async::task(async_closure! { $($body)* });
-        Worker::current().push(Box::new(task));
-        // No return value
-    }
-}
+    ($i: ident, $($body: tt)*) => {
+        {
+            // $i is supposed to be `channel`
+            let (sender, receiver) = $i();
+            let task = Async::promise(async_closure! { $($body)* }, sender);
+            Worker::current().push(Box::new(task));
+            Future::Chan(receiver)
+        }
+    };
 
-#[macro_export]
-macro_rules! async_future {
-    // `tt` is a token tree
-    ($e:expr, $($body: tt)*) => {
+    ($e: expr, $($body: tt)*) => {
         {
             let task = Async::future(async_closure! { $($body)* }, $e);
             Worker::current().push(Box::new(task));
@@ -27,10 +27,9 @@ macro_rules! async_future {
 
     ($($body: tt)*) => {
         {
-            let (sender, receiver) = channel();
-            let task = Async::promise(async_closure! { $($body)* }, sender);
+            let task = Async::task(async_closure! { $($body)* });
             Worker::current().push(Box::new(task));
-            Future::Chan(receiver)
+            // No return value
         }
     }
 }
@@ -49,11 +48,11 @@ mod tests {
         let master = runtime.master;
 
         for _ in 0..5 {
-            async_task! {
+            spawn! {
                 for _ in 0..5 {
-                    async_task! {
+                    spawn! {
                         for _ in 0..3 {
-                            async_task!();
+                            spawn!();
                         }
                     }
                 }
@@ -81,14 +80,14 @@ mod tests {
     }
 
     fn sum(n: u32) -> u32 {
-        if n <= 1 { n } else { n + async_future!(sum(n - 1)).wait() }
+        if n <= 1 { n } else { n + spawn!(channel, sum(n - 1)).wait() }
     }
 
     #[test]
     fn async_futures() {
         let runtime = Runtime::init(3);
 
-        let mut n = async_future!(sum(10));
+        let mut n = spawn!(channel, sum(10));
         assert_eq!(n.wait(), 55);
 
         let stats = runtime.join();
