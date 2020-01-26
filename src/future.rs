@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn future_promise_thread_lazy() {
+    fn future_promise_lazy_thread() {
         let mut f1 = Future::Lazy(None);
         let mut p1 = Promise::Lazy(&mut f1);
         p1.promote();

@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_task_to_thread() {
+    fn simple_task_thread() {
         // Unboxed task + boxed closure
         let a = SimpleTask::new(Box::new(|| 1));
         thread::spawn(move || a.run()).join().unwrap();
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn async_future_to_thread() {
+    fn async_future_thread() {
         let (sender, receiver) = channel();
         let a = Async::new(Box::new(|| "hi"), sender.to_promise());
         let t = thread::spawn(|| a.run());
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn async_future_to_thread_lazy() {
+    fn async_future_lazy_thread() {
         let mut f = Future::Lazy(None);
         let mut a = Async::new(Box::new(|| "hi"), (&mut f).to_promise());
         a.promote();
