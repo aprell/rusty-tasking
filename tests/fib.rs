@@ -1,9 +1,11 @@
 #[macro_use]
 extern crate rusty_tasking;
 
+use rusty_tasking::future::Future;
 use rusty_tasking::runtime::Runtime;
 use rusty_tasking::task::Async;
 use rusty_tasking::worker::Worker;
+use std::sync::mpsc::channel;
 
 fn parfib(n: u64) -> u64 {
     if n < 2 { return n; }

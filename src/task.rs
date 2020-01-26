@@ -1,4 +1,4 @@
-use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
 
 use crate::future::{Future, Promise};
 
@@ -34,10 +34,13 @@ impl Async<()> {
 
 impl<T> Async<T> {
     // Constructor for tasks with return values
-    pub fn future(task: Box<Thunk<T>>) -> (Async<T>, Future<T>)  {
-        let (sender, receiver) = channel();
-        let promise = Some(Promise::Chan(sender));
-        (Async { task, promise }, Future::Chan(receiver))
+    pub fn future(task: Box<Thunk<T>>, future: &mut Future<T>) -> Async<T> {
+        Async { task, promise: Some(Promise::Lazy(future)) }
+    }
+
+    // Constructor for tasks with return values
+    pub fn promise(task: Box<Thunk<T>>, sender: Sender<T>) -> Async<T> {
+        Async { task, promise: Some(Promise::Chan(sender)) }
     }
 
     pub fn run(mut self) {
@@ -77,6 +80,7 @@ impl<T> Task for Async<T> where T: Send {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc::channel;
     use std::thread;
     use super::*;
 
@@ -170,18 +174,42 @@ mod tests {
         let a = Async::task(Box::new(|| ()));
         a.run();
         // `a` has been consumed
+    }
 
-        let (a, f) = Async::future(Box::new(|| 3.14));
+    #[test]
+    fn async_future() {
+        let (sender, receiver) = channel();
+        let a = Async::promise(Box::new(|| 3.14), sender);
+        a.run();
+        // `a` has been consumed
+        assert_eq!(Future::Chan(receiver).get(), 3.14);
+    }
+
+    #[test]
+    fn async_future_lazy() {
+        let mut f = Future::Lazy(None);
+        let a = Async::future(Box::new(|| 3.14), &mut f);
         a.run();
         // `a` has been consumed
         assert_eq!(f.get(), 3.14);
     }
 
     #[test]
-    fn async_task_to_thread() {
-        let (a, f) = Async::future(Box::new(|| "hi"));
+    fn async_future_to_thread() {
+        let (sender, receiver) = channel();
+        let a = Async::promise(Box::new(|| "hi"), sender);
         let t = thread::spawn(|| a.run());
-        assert_eq!(f.get(), "hi");
+        assert_eq!(Future::Chan(receiver).get(), "hi");
         t.join().unwrap();
+    }
+
+    #[test]
+    fn async_future_to_thread_lazy() {
+        let mut f = Future::Lazy(None);
+        let mut a = Async::future(Box::new(|| "hi"), &mut f);
+        a.promote();
+        let t = thread::spawn(|| a.run());
+        t.join().unwrap();
+        assert_eq!(f.get(), "hi");
     }
 }

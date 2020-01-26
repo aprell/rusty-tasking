@@ -17,20 +17,31 @@ macro_rules! async_task {
 #[macro_export]
 macro_rules! async_future {
     // `tt` is a token tree
+    ($e:expr, $($body: tt)*) => {
+        {
+            let task = Async::future(async_closure! { $($body)* }, $e);
+            Worker::current().push(Box::new(task));
+            $e
+        }
+    };
+
     ($($body: tt)*) => {
         {
-            let (task, future) = Async::future(async_closure! { $($body)* });
+            let (sender, receiver) = channel();
+            let task = Async::promise(async_closure! { $($body)* }, sender);
             Worker::current().push(Box::new(task));
-            future
+            Future::Chan(receiver)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::future::Future;
     use crate::runtime::Runtime;
     use crate::task::Async;
     use crate::worker::Worker;
+    use std::sync::mpsc::channel;
 
     #[test]
     fn async_tasks() {

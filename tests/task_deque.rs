@@ -1,6 +1,7 @@
 use rusty_tasking::deque::{Deque, Steal, StealMany};
 use rusty_tasking::future::Future;
 use rusty_tasking::task::{Async, Task, Thunk};
+use std::sync::mpsc::channel;
 use std::thread;
 
 type TaskDeque = Deque<Box<dyn Task>>;
@@ -8,9 +9,10 @@ type TaskDeque = Deque<Box<dyn Task>>;
 fn future<T>(thunk: Box<Thunk<T>>, deque: &mut TaskDeque) -> Future<T>
 where T: Send + 'static
 {
-    let (task, future) = Async::future(thunk);
+    let (sender, receiver) = channel();
+    let task = Async::promise(thunk, sender);
     deque.push(Box::new(task));
-    future
+    Future::Chan(receiver)
 }
 
 #[test]
