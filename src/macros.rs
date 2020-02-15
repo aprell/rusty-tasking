@@ -70,7 +70,7 @@ mod tests {
             }
         }
 
-        master.stats.num_tasks_executed.increment(num_tasks_executed);
+        master.stats.num_tasks_executed.add(num_tasks_executed);
 
         // TODO Task barrier needed
 

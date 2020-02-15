@@ -55,7 +55,7 @@ impl<T> Future<T> {
             task.run();
             num_tasks_executed += 1;
             if let Some(val) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
+                worker.stats.num_tasks_executed.add(num_tasks_executed);
                 return val;
             }
         }
@@ -70,7 +70,7 @@ impl<T> Future<T> {
                 _ => panic!(),
             }
             if let Some(res) = self.try_get() {
-                worker.stats.num_tasks_executed.increment(num_tasks_executed);
+                worker.stats.num_tasks_executed.add(num_tasks_executed);
                 return res;
             }
         }

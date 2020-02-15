@@ -5,24 +5,32 @@ use std::ops::AddAssign;
 pub struct Count(Cell<u32>);
 
 impl Count {
-    pub fn new() -> Count {
-        Count(Cell::new(0))
+    pub fn new(value: u32) -> Count {
+        Count(Cell::new(value))
     }
 
     pub fn get(&self) -> u32 {
         self.0.get()
     }
 
-    pub fn set(&self, val: u32) {
-        self.0.set(val);
+    pub fn set(&self, value: u32) {
+        self.0.set(value);
     }
 
-    pub fn increment(&self, incr: u32) {
-        self.set(self.get() + incr);
+    pub fn add(&self, value: u32) {
+        self.set(self.get() + value);
     }
 
-    pub fn decrement(&self, decr: u32) {
-        self.set(self.get() - decr);
+    pub fn sub(&self, value: u32) {
+        self.set(self.get() - value);
+    }
+
+    pub fn inc(&self) {
+        self.add(1);
+    }
+
+    pub fn dec(&self) {
+        self.sub(1);
     }
 }
 
@@ -33,12 +41,11 @@ pub struct Stats {
 
 impl Stats {
     pub fn new() -> Stats {
-        Stats { num_tasks_executed: Count::new() }
+        Stats { num_tasks_executed: Count::new(0) }
     }
 
     pub fn update(&self, other: &Stats) {
-        let num_tasks_executed = other.num_tasks_executed.get();
-        self.num_tasks_executed.increment(num_tasks_executed);
+        self.num_tasks_executed.add(other.num_tasks_executed.get());
     }
 }
 
@@ -54,19 +61,19 @@ mod tests {
 
     #[test]
     fn count_up_and_down() {
-        let c = Count::new();
+        let c = Count::new(0);
         for i in 1..=10 {
-            c.increment(i);
+            c.add(i);
         }
         assert_eq!(c.get(), 55);
-        c.decrement(10);
-        assert_eq!(c.get(), 45);
+        c.sub(55);
+        assert_eq!(c.get(), 0);
     }
 
     #[test]
     fn update_stats() {
         let s = Stats::new();
-        s.num_tasks_executed.increment(100);
+        s.num_tasks_executed.add(100);
 
         let mut t = Stats::new();
         t += s;

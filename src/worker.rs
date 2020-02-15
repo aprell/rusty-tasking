@@ -206,7 +206,7 @@ impl Worker {
                 }
             }
         }
-        self.stats.num_tasks_executed.increment(num_tasks_executed);
+        self.stats.num_tasks_executed.add(num_tasks_executed);
     }
 }
 
