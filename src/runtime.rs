@@ -1,3 +1,4 @@
+use crate::scope::Scope;
 use crate::stats::*;
 use crate::worker::*;
 use std::sync::{Arc, Barrier, Mutex};
@@ -44,6 +45,7 @@ impl Runtime {
             workers.push(thread::spawn(move || {
                 Worker::new(i, channel, coworkers).make_current();
                 let worker = Worker::current();
+                Scope::init();
                 barrier.wait();
                 worker.go();
                 worker.finalize();
@@ -59,6 +61,7 @@ impl Runtime {
 
         Worker::new(0, channels.remove(0), coworkers).make_current();
         let master = Worker::current();
+        Scope::init();
         barrier.wait();
 
         Runtime { master, workers, barrier, stats }

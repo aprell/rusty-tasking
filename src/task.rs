@@ -1,5 +1,8 @@
+use crate::atomic;
 use crate::future::Promise;
+use crate::scope::{TaskCount, NumTasks, Scope};
 use std::fmt;
+use std::sync::Arc;
 
 // Storing closures requires generics and trait bounds. All closures implement
 // at least one of the traits `Fn`, `FnMut`, or `FnOnce`. For instance, a
@@ -25,7 +28,6 @@ pub struct Async<T> {
 }
 
 impl<T> Async<T> {
-    // Constructor for tasks with and without return values
     pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> Async<T> {
         Async { task, promise }
     }
@@ -55,6 +57,61 @@ impl<T> fmt::Debug for Async<T> {
 
 impl<T> Task for Async<T> where T: Send {
     fn run(self: Box<Async<T>>) {
+        (*self).run();
+    }
+
+    fn promote(&mut self) {
+        (*self).promote();
+    }
+}
+
+// A scoped task with return type `T`
+pub struct ScopedAsync<T> {
+    task: Box<Thunk<T>>,
+    promise: Option<Promise<T>>,
+    num_tasks_in_scope: Option<Arc<atomic::Count>>,
+}
+
+impl<T> ScopedAsync<T> {
+    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> ScopedAsync<T> {
+        Scope::current().num_tasks.inc();
+        //println!("{}", Scope::current().num_tasks.get());
+        ScopedAsync { task, promise, num_tasks_in_scope: None }
+    }
+
+    pub fn run(mut self) {
+        if let Some(count) = self.num_tasks_in_scope.take() {
+            let num_tasks = NumTasks::with_count(TaskCount::Shared(count));
+            Scope::with_num_tasks(num_tasks).push();
+        }
+        let result = (self.task)();
+        if let Some(promise) = self.promise {
+            promise.set(result)
+        }
+        //println!("{}", Scope::current().num_tasks.get());
+        Scope::current().num_tasks.dec();
+    }
+
+    pub fn promote(&mut self) {
+        if let Some(ref mut promise) = self.promise {
+            promise.promote();
+        }
+        assert!(self.num_tasks_in_scope.is_none());
+        self.num_tasks_in_scope = Some(Scope::current().share());
+    }
+}
+
+impl<T> fmt::Debug for ScopedAsync<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match (*self).promise {
+            Some(_) => write!(f, "<Future>"),
+            None => write!(f, "<Task>"),
+        }
+    }
+}
+
+impl<T> Task for ScopedAsync<T> where T: Send {
+    fn run(self: Box<ScopedAsync<T>>) {
         (*self).run();
     }
 
@@ -197,5 +254,38 @@ mod tests {
         let t = thread::spawn(|| a.run());
         t.join().unwrap();
         assert_eq!(f.get(), "hi");
+    }
+
+    #[test]
+    fn scoped_async_task() {
+        Scope::init();
+        // {
+        let a = ScopedAsync::new(Box::new(|| ()), None);
+        assert_eq!(Scope::current().num_tasks.get(), 1);
+        a.run();
+        assert_eq!(Scope::current().num_tasks.get(), 0);
+        // }
+        Scope::pop();
+    }
+
+    #[test]
+    fn scoped_async_task_thread() {
+        Scope::init();
+        // {
+        let mut a = ScopedAsync::new(Box::new(|| ()), None);
+        assert_eq!(Scope::current().num_tasks.get(), 1);
+        a.promote();
+
+        let t = thread::spawn(|| {
+            Scope::init();
+            a.run();
+            assert_eq!(Scope::current().num_tasks.get(), 0);
+            Scope::pop();
+        });
+
+        while Scope::current().num_tasks.get() != 0 {}
+        t.join().unwrap();
+        // }
+        Scope::pop();
     }
 }
