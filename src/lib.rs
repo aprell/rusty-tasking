@@ -6,6 +6,7 @@ pub mod atomic;
 pub mod deque;
 pub mod future;
 pub mod runtime;
+pub mod scope;
 pub mod stats;
 pub mod task;
 pub mod worker;
