@@ -34,11 +34,54 @@ macro_rules! spawn {
     }
 }
 
+#[macro_export]
+macro_rules! scoped_spawn {
+    // `tt` is a token tree
+    ($i: ident, $($body: tt)*) => {
+        {
+            // $i is supposed to be `channel`
+            let (sender, receiver) = $i();
+            let task = ScopedAsync::new(async_closure! { $($body)* }, sender.to_promise());
+            Worker::current().push(Box::new(task));
+            Future::Chan(receiver)
+        }
+    };
+
+    ($e: expr, $($body: tt)*) => {
+        {
+            let task = ScopedAsync::new(async_closure! { $($body)* }, $e.to_promise());
+            Worker::current().push(Box::new(task));
+            $e
+        }
+    };
+
+    ($($body: tt)*) => {
+        {
+            let task = ScopedAsync::new(async_closure! { $($body)* }, None);
+            Worker::current().push(Box::new(task));
+            // No return value
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! finish {
+    // `tt` is a token tree
+    ($($body: tt)*) => {
+        {
+            Scope::enter();
+            $($body)*
+            Scope::leave();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::future::{Future, ToPromise};
     use crate::runtime::Runtime;
-    use crate::task::Async;
+    use crate::scope::Scope;
+    use crate::task::{Async, ScopedAsync};
     use crate::worker::Worker;
 
     #[test]
@@ -73,6 +116,28 @@ mod tests {
         master.stats.num_tasks_executed.add(num_tasks_executed);
 
         // TODO Task barrier needed
+
+        let stats = runtime.join();
+        assert_eq!(stats.num_tasks_executed.get(), 105);
+    }
+
+    #[test]
+    fn scoped_async_tasks() {
+        let runtime = Runtime::init(3);
+
+        finish! {
+            for _ in 0..5 {
+                scoped_spawn! {
+                    for _ in 0..5 {
+                        scoped_spawn! {
+                            for _ in 0..3 {
+                                scoped_spawn!();
+                            }
+                        }
+                    }
+                }
+            }
+        } // Implicit barrier
 
         let stats = runtime.join();
         assert_eq!(stats.num_tasks_executed.get(), 105);
