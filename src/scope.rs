@@ -151,7 +151,7 @@ impl Scope {
                 Some(ref scope) => *scope as *const Scope,
                 None => std::ptr::null(),
             };
-            // (2) Convert this pointer to a borrowed reference
+            // Convert this pointer to a borrowed reference
             unsafe { &*ptr }
         })
     }
