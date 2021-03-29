@@ -17,10 +17,10 @@ on, after some progress on my own.
 
 ## Learning Rust
 
-- [The Rust Programming Language][https://doc.rust-lang.org/book/]
-- [A Half Hour to Learn Rust][https://fasterthanli.me/articles/a-half-hour-to-learn-rust]
-- [Safe Systems Programming in Rust][https://iris-project.org/pdfs/2021-rustbelt-cacm-final.pdf]
-- [The Usability of Ownership][https://arxiv.org/abs/2011.06171]
+- [The Rust Programming Language](https://doc.rust-lang.org/book/)
+- [A Half Hour to Learn Rust](https://fasterthanli.me/articles/a-half-hour-to-learn-rust)
+- [Safe Systems Programming in Rust](https://iris-project.org/pdfs/2021-rustbelt-cacm-final.pdf)
+- [The Usability of Ownership](https://arxiv.org/abs/2011.06171)
 
 <!-- Links -->
 
