@@ -15,7 +15,7 @@ fn parfib(n: u64) -> u64 {
 }
 
 #[test]
-fn main() {
+fn fib() {
     // Create three additional workers
     let runtime = Runtime::init(4);
 
