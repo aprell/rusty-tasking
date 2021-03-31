@@ -12,7 +12,7 @@ on, after some progress on my own.
 
 ## Interesting Directions
 
-- Implement scoped tasks
+- Implement [scoped tasks](src/scope.rs)
 - Implement [proactive work stealing for futures][5]
 
 ## Learning Rust
