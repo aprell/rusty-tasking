@@ -1,0 +1,5 @@
+[package]
+name = "utils"
+version = "0.1.0"
+authors = ["Andreas Prell <andreas.h.prell@gmail.com>"]
+edition = "2018"
