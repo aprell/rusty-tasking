@@ -28,8 +28,8 @@ pub struct Async<T> {
 }
 
 impl<T> Async<T> {
-    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> Async<T> {
-        Async { task, promise }
+    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> Self {
+        Self { task, promise }
     }
 
     pub fn run(mut self) {
@@ -56,7 +56,7 @@ impl<T> fmt::Debug for Async<T> {
 }
 
 impl<T> Task for Async<T> where T: Send {
-    fn run(self: Box<Async<T>>) {
+    fn run(self: Box<Self>) {
         (*self).run();
     }
 
@@ -73,10 +73,10 @@ pub struct ScopedAsync<T> {
 }
 
 impl<T> ScopedAsync<T> {
-    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> ScopedAsync<T> {
+    pub fn new(task: Box<Thunk<T>>, promise: Option<Promise<T>>) -> Self {
         Scope::current().num_tasks.inc();
         //println!("{}", Scope::current().num_tasks.get());
-        ScopedAsync { task, promise, num_tasks_in_scope: None }
+        Self { task, promise, num_tasks_in_scope: None }
     }
 
     pub fn run(mut self) {
@@ -111,7 +111,7 @@ impl<T> fmt::Debug for ScopedAsync<T> {
 }
 
 impl<T> Task for ScopedAsync<T> where T: Send {
-    fn run(self: Box<ScopedAsync<T>>) {
+    fn run(self: Box<Self>) {
         (*self).run();
     }
 
@@ -133,8 +133,8 @@ mod tests {
     struct SimpleTask<T>(Box<Thunk<T>>);
 
     impl<T> SimpleTask<T> {
-        fn new(task: Box<Thunk<T>>) -> SimpleTask<T> {
-            SimpleTask(task)
+        fn new(task: Box<Thunk<T>>) -> Self {
+            Self(task)
         }
 
         fn run(mut self) {
@@ -144,7 +144,7 @@ mod tests {
     }
 
     impl<T> Task for SimpleTask<T> {
-        fn run(mut self: Box<SimpleTask<T>>) {
+        fn run(mut self: Box<Self>) {
             // Ignore result
             let _ = (*self).0();
         }

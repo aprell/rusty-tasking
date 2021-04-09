@@ -18,26 +18,26 @@ pub enum TaskCount {
 }
 
 impl TaskCount {
-    pub fn new() -> TaskCount {
-        TaskCount::Private(stats::Count::new(0))
+    pub fn new() -> Self {
+        Self::Private(stats::Count::new(0))
     }
 
     pub fn get(&self) -> u32 {
         match self {
-            TaskCount::Private(count) => count.get(),
-            TaskCount::Shared(count) => count.get(Ordering::Relaxed),
+            Self::Private(count) => count.get(),
+            Self::Shared(count) => count.get(Ordering::Relaxed),
         }
     }
 
     // Returns the previous value
     pub fn inc(&self) -> u32 {
         match self {
-            TaskCount::Private(count) => {
+            Self::Private(count) => {
                 let n = count.get();
                 count.inc();
                 n
             }
-            TaskCount::Shared(count) => {
+            Self::Shared(count) => {
                 count.inc(Ordering::Relaxed)
             }
         }
@@ -46,12 +46,12 @@ impl TaskCount {
     // Returns the previous value
     pub fn dec(&self) -> u32 {
         match self {
-            TaskCount::Private(count) => {
+            Self::Private(count) => {
                 let n = count.get();
                 count.dec();
                 n
             }
-            TaskCount::Shared(count) => {
+            Self::Shared(count) => {
                 count.dec(Ordering::Relaxed)
             }
         }
@@ -61,12 +61,12 @@ impl TaskCount {
 pub struct NumTasks(RefCell<TaskCount>);
 
 impl NumTasks {
-    pub fn new() -> NumTasks {
-        NumTasks::with_count(TaskCount::new())
+    pub fn new() -> Self {
+        Self::with_count(TaskCount::new())
     }
 
-    pub fn with_count(count: TaskCount) -> NumTasks {
-        NumTasks(RefCell::new(count))
+    pub fn with_count(count: TaskCount) -> Self {
+        Self(RefCell::new(count))
     }
 
     pub fn get(&self) -> u32 {
@@ -99,24 +99,24 @@ pub struct Scope {
 
 impl Scope {
     pub fn init() {
-        Scope::with_level(0).push();
+        Self::with_level(0).push();
     }
 
-    fn with_level(level: u32) -> Scope {
-        Scope { level, num_tasks: NumTasks::new() }
+    fn with_level(level: u32) -> Self {
+        Self { level, num_tasks: NumTasks::new() }
     }
 
-    pub fn with_num_tasks(num_tasks: NumTasks) -> Scope {
-        let scope = Scope::current();
+    pub fn with_num_tasks(num_tasks: NumTasks) -> Self {
+        let scope = Self::current();
         assert_ne!(scope as *const Scope, std::ptr::null());
-        Scope { level: scope.level + 1, num_tasks }
+        Self { level: scope.level + 1, num_tasks }
 
     }
 
-    pub fn new() -> Scope {
-        let scope = Scope::current();
-        assert_ne!(scope as *const Scope, std::ptr::null());
-        Scope::with_level(scope.level + 1)
+    pub fn new() -> Self {
+        let scope = Self::current();
+        assert_ne!(scope as *const Self, std::ptr::null());
+        Self::with_level(scope.level + 1)
     }
 
     pub fn push(self) {
@@ -126,7 +126,7 @@ impl Scope {
         });
     }
 
-    pub fn pop() -> Option<Scope> {
+    pub fn pop() -> Option<Self> {
         SCOPE.with(|scope| {
             let mut scope = scope.borrow_mut();
             scope.pop_front()
@@ -134,21 +134,21 @@ impl Scope {
     }
 
     pub fn enter() {
-        Scope::new().push();
+        Self::new().push();
     }
 
     pub fn leave() {
-        Scope::current().wait();
-        assert_eq!(Scope::current().num_tasks.get(), 0);
-        Scope::pop().unwrap();
+        Self::current().wait();
+        assert_eq!(Self::current().num_tasks.get(), 0);
+        Self::pop().unwrap();
     }
 
     // Get a reference to the current scope
-    pub fn current<'a>() -> &'a Scope {
+    pub fn current<'a>() -> &'a Self {
         SCOPE.with(|scope| {
             // See `Worker::current`
             let ptr = match scope.borrow().front() {
-                Some(ref scope) => *scope as *const Scope,
+                Some(ref scope) => *scope as *const Self,
                 None => std::ptr::null(),
             };
             // Convert this pointer to a borrowed reference

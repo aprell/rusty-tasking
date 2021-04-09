@@ -43,9 +43,9 @@ thread_local! {
 impl Worker {
     pub fn new(id: usize,
                steal_requests: Receiver<StealRequest>,
-               coworkers: Vec<Coworker>) -> Worker
+               coworkers: Vec<Coworker>) -> Self
     {
-        let mut worker = Worker {
+        let mut worker = Self {
             id,
             deque: RefCell::new(Deque::new()),
             channels: WorkerChannels { steal_requests, tasks: channel() },
@@ -89,13 +89,13 @@ impl Worker {
     }
 
     // Get a handle to the current worker
-    pub fn current<'a>() -> &'a Worker {
+    pub fn current<'a>() -> &'a Self {
         WORKER.with(|worker| {
             // Any attempt of trying to borrow from `worker` and have it
             // outlive the closure will fail -> `unsafe` to the rescue
             // (1) Get a raw pointer to thread-local `WORKER`
             let ptr = match worker.borrow().as_ref() {
-                Some(ref worker) => *worker as *const Worker,
+                Some(ref worker) => *worker as *const Self,
                 None => std::ptr::null(),
             };
             // (2) Convert this pointer to a borrowed reference
@@ -217,8 +217,8 @@ pub struct Coworker {
 }
 
 impl Coworker {
-    pub fn new(id: usize, steal_requests: Sender<StealRequest>) -> Coworker {
-        Coworker { id, steal_requests }
+    pub fn new(id: usize, steal_requests: Sender<StealRequest>) -> Self {
+        Self { id, steal_requests }
     }
 
     pub fn send_steal_request(&self, req: StealRequest) {
@@ -229,7 +229,7 @@ impl Coworker {
 
 impl Clone for Coworker {
     fn clone(&self) -> Self {
-        Coworker {
+        Self {
             id: self.id,
             steal_requests: Sender::clone(&self.steal_requests),
         }

@@ -13,7 +13,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn init(num_workers: usize) -> Runtime {
+    pub fn init(num_workers: usize) -> Self {
         assert!(num_workers > 0);
 
         let mut workers = Vec::with_capacity(num_workers - 1);
@@ -64,7 +64,7 @@ impl Runtime {
         Scope::init();
         barrier.wait();
 
-        Runtime { master, workers, barrier, stats }
+        Self { master, workers, barrier, stats }
     }
 
     pub fn join(self) -> Stats {

@@ -5,8 +5,8 @@ use std::ops::AddAssign;
 pub struct Count(Cell<u32>);
 
 impl Count {
-    pub fn new(value: u32) -> Count {
-        Count(Cell::new(value))
+    pub fn new(value: u32) -> Self {
+        Self(Cell::new(value))
     }
 
     pub fn get(&self) -> u32 {
@@ -40,17 +40,17 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new() -> Stats {
-        Stats { num_tasks_executed: Count::new(0) }
+    pub fn new() -> Self {
+        Self { num_tasks_executed: Count::new(0) }
     }
 
-    pub fn update(&self, other: &Stats) {
+    pub fn update(&self, other: &Self) {
         self.num_tasks_executed.add(other.num_tasks_executed.get());
     }
 }
 
 impl AddAssign for Stats {
-    fn add_assign(&mut self, other: Stats) {
+    fn add_assign(&mut self, other: Self) {
         self.update(&other);
     }
 }

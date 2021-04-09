@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 pub struct Count(AtomicU32);
 
 impl Count {
-    pub fn new(value: u32) -> Count {
-        Count(AtomicU32::new(value))
+    pub fn new(value: u32) -> Self {
+        Self(AtomicU32::new(value))
     }
 
     pub fn get(&self, ordering: Ordering) -> u32 {

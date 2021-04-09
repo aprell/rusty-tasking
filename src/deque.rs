@@ -17,8 +17,8 @@ pub trait StealMany<T>: Steal<T> {
 pub struct Deque<T>(VecDeque<T>);
 
 impl<T> Deque<T> {
-    pub fn new() -> Deque<T> {
-        Deque(VecDeque::new())
+    pub fn new() -> Self {
+        Self(VecDeque::new())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -53,7 +53,7 @@ impl<T> Steal<T> for Deque<T> {
 }
 
 impl<T> StealMany<T> for Deque<T> {
-    type Loot = Deque<T>;
+    type Loot = Self;
 
     fn steal_many(&mut self) -> Option<Self::Loot> {
         let len = self.0.len();

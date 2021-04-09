@@ -27,15 +27,15 @@ impl<T> Future<T> {
     pub fn get(self) -> T {
         match self {
             // Panic if opt.is_none() (better than waiting forever)
-            Future::Lazy(opt) => opt.unwrap(),
-            Future::Chan(chan) => chan.recv().unwrap(),
+            Self::Lazy(opt) => opt.unwrap(),
+            Self::Chan(chan) => chan.recv().unwrap(),
         }
     }
 
     fn try_get(&mut self) -> Option<T> {
         match self {
-            Future::Lazy(opt) => opt.take(),
-            Future::Chan(chan) => chan.try_recv().ok(),
+            Self::Lazy(opt) => opt.take(),
+            Self::Chan(chan) => chan.try_recv().ok(),
         }
     }
 
@@ -80,18 +80,18 @@ impl<T> Future<T> {
 impl<T> Promise<T> {
     pub fn promote(&mut self) {
         match *self {
-            Promise::Lazy(fut) => {
+            Self::Lazy(fut) => {
                 let (sender, receiver) = channel();
                 unsafe { *fut = Future::Chan(receiver); }
                 *self = Promise::Chan(sender);
             },
-            Promise::Chan(_) => (),
+            Self::Chan(_) => (),
         }
     }
 
     pub fn set(self, value: T) {
         match self {
-            Promise::Lazy(fut) => unsafe {
+            Self::Lazy(fut) => unsafe {
                 match *fut {
                     Future::Lazy(ref mut opt) => {
                         assert!(opt.is_none());
@@ -103,7 +103,7 @@ impl<T> Promise<T> {
                     }
                 }
             }
-            Promise::Chan(chan) => {
+            Self::Chan(chan) => {
                 chan.send(value).unwrap();
             }
         }
