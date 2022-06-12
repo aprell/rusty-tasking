@@ -14,7 +14,7 @@ on, after some progress on my own.
 
 - Implement [scoped tasks](src/scope.rs)
 - Implement [proactive work stealing for futures][5]
-- Implement [worker preemption][6]
+- Implement preemptible [tasks][6] or [workers][7]
 
 ## Learning Rust
 
@@ -31,4 +31,5 @@ on, after some progress on my own.
 [3]: https://crates.io/crates/crossbeam
 [4]: https://crates.io/crates/rayon
 [5]: https://dl.acm.org/doi/10.1145/3293883.3295735
-[6]: https://dl.acm.org/doi/10.1145/3437801.3441610
+[6]: usenix.org/conference/atc20/presentation/boucher
+[7]: https://dl.acm.org/doi/10.1145/3437801.3441610
