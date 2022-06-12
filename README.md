@@ -31,5 +31,5 @@ on, after some progress on my own.
 [3]: https://crates.io/crates/crossbeam
 [4]: https://crates.io/crates/rayon
 [5]: https://dl.acm.org/doi/10.1145/3293883.3295735
-[6]: usenix.org/conference/atc20/presentation/boucher
+[6]: https://www.usenix.org/conference/atc20/presentation/boucher
 [7]: https://dl.acm.org/doi/10.1145/3437801.3441610
