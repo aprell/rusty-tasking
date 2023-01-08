@@ -48,7 +48,7 @@ impl<T> Async<T> {
 
 impl<T> fmt::Debug for Async<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match (*self).promise {
+        match self.promise {
             Some(_) => write!(f, "<Future>"),
             None => write!(f, "<Task>"),
         }
@@ -103,7 +103,7 @@ impl<T> ScopedAsync<T> {
 
 impl<T> fmt::Debug for ScopedAsync<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match (*self).promise {
+        match self.promise {
             Some(_) => write!(f, "<Future>"),
             None => write!(f, "<Task>"),
         }
