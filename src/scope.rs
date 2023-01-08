@@ -148,7 +148,7 @@ impl Scope {
         SCOPE.with(|scope| {
             // See `Worker::current`
             let ptr = match scope.borrow().front() {
-                Some(ref scope) => *scope as *const Self,
+                Some(scope) => scope as *const Self,
                 None => std::ptr::null(),
             };
             // Convert this pointer to a borrowed reference
@@ -159,7 +159,7 @@ impl Scope {
     pub fn share(&self) -> Arc<atomic::Count> {
         let count = match &*self.num_tasks.borrow() {
             TaskCount::Private(count) => count.get(),
-            TaskCount::Shared(count) => return Arc::clone(&count),
+            TaskCount::Shared(count) => return Arc::clone(count),
         };
         let count = Arc::new(atomic::Count::new(count));
         let clone = Arc::clone(&count);

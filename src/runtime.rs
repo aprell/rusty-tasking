@@ -26,7 +26,7 @@ impl Runtime {
         let coworkers = channels
             .iter()
             .enumerate()
-            .map(|(i, (chan, _))| Coworker::new(i, Sender::clone(&chan)))
+            .map(|(i, (chan, _))| Coworker::new(i, Sender::clone(chan)))
             .collect::<Vec<Coworker>>();
 
         let mut channels = channels

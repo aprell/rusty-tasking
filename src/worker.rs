@@ -95,7 +95,7 @@ impl Worker {
             // outlive the closure will fail -> `unsafe` to the rescue
             // (1) Get a raw pointer to thread-local `WORKER`
             let ptr = match worker.borrow().as_ref() {
-                Some(ref worker) => *worker as *const Self,
+                Some(worker) => worker as *const Self,
                 None => std::ptr::null(),
             };
             // (2) Convert this pointer to a borrowed reference
