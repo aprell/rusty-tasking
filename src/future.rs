@@ -83,7 +83,7 @@ impl<T> Promise<T> {
             Self::Lazy(fut) => {
                 let (sender, receiver) = channel();
                 unsafe { *fut = Future::Chan(receiver); }
-                *self = Promise::Chan(sender);
+                *self = Self::Chan(sender);
             },
             Self::Chan(_) => (),
         }
@@ -110,27 +110,15 @@ impl<T> Promise<T> {
     }
 }
 
-// The types that can be used to construct a promise
-
-pub trait MakePromise<T> {
-    fn make_promise(self) -> Option<Promise<T>>;
-}
-
-impl<T> MakePromise<T> for () {
-    fn make_promise(self) -> Option<Promise<T>> {
-        None
+impl<T> From<Sender<T>> for Promise<T> {
+    fn from(value: Sender<T>) -> Self {
+        Promise::Chan(value)
     }
 }
 
-impl<T> MakePromise<T> for Sender<T> {
-    fn make_promise(self) -> Option<Promise<T>> {
-        Some(Promise::Chan(self))
-    }
-}
-
-impl<T> MakePromise<T> for &mut Future<T> {
-    fn make_promise(self) -> Option<Promise<T>> {
-        Some(Promise::Lazy(self))
+impl<T> From<&mut Future<T>> for Promise<T> {
+    fn from(value: &mut Future<T>) -> Self {
+        Promise::Lazy(value)
     }
 }
 

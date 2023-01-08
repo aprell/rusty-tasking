@@ -122,7 +122,7 @@ impl<T> Task for ScopedAsync<T> where T: Send {
 
 #[cfg(test)]
 mod tests {
-    use crate::future::{Future, MakePromise};
+    use crate::future::Future;
     use std::sync::mpsc::channel;
     use std::thread;
     use super::*;
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn async_future() {
         let (sender, receiver) = channel();
-        let a = Async::new(Box::new(|| 3.14), sender.make_promise());
+        let a = Async::new(Box::new(|| 3.14), Some(Promise::from(sender)));
         a.run();
         // `a` has been consumed
         assert_eq!(Future::Chan(receiver).get(), 3.14);
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn async_future_lazy() {
         let mut f = Future::Lazy(None);
-        let a = Async::new(Box::new(|| 3.14), (&mut f).make_promise());
+        let a = Async::new(Box::new(|| 3.14), Some(Promise::from(&mut f)));
         a.run();
         // `a` has been consumed
         assert_eq!(f.get(), 3.14);
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn async_future_thread() {
         let (sender, receiver) = channel();
-        let a = Async::new(Box::new(|| "hi"), sender.make_promise());
+        let a = Async::new(Box::new(|| "hi"), Some(Promise::from(sender)));
         let t = thread::spawn(|| a.run());
         assert_eq!(Future::Chan(receiver).get(), "hi");
         t.join().unwrap();
@@ -249,7 +249,7 @@ mod tests {
     #[test]
     fn async_future_lazy_thread() {
         let mut f = Future::Lazy(None);
-        let mut a = Async::new(Box::new(|| "hi"), (&mut f).make_promise());
+        let mut a = Async::new(Box::new(|| "hi"), Some(Promise::from(&mut f)));
         a.promote();
         let t = thread::spawn(|| a.run());
         t.join().unwrap();
