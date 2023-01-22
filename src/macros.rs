@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn async_tasks() {
         let runtime = Runtime::init(3);
-        let master = runtime.master;
+        let leader = runtime.leader;
 
         for _ in 0..5 {
             spawn! {
@@ -102,9 +102,9 @@ mod tests {
         }
 
         let mut num_tasks_executed = 0;
-        while master.has_tasks() {
-            master.try_handle_steal_request();
-            match master.pop() {
+        while leader.has_tasks() {
+            leader.try_handle_steal_request();
+            match leader.pop() {
                 Some(task) => {
                     task.run();
                     num_tasks_executed += 1;
@@ -113,7 +113,7 @@ mod tests {
             }
         }
 
-        master.stats.num_tasks_executed.add(num_tasks_executed);
+        leader.stats.num_tasks_executed.add(num_tasks_executed);
 
         // TODO Task barrier needed
 

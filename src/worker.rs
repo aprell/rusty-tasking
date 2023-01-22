@@ -308,18 +308,18 @@ mod tests {
             }));
         }
 
-        let master = Worker::new(0, channels.remove(0), coworkers);
+        let leader = Worker::new(0, channels.remove(0), coworkers);
         barrier.wait();
 
         // Respond to the first ten steal requests with `Tasks::None`
         for _ in 0..10 {
-            let req = master.channels.steal_requests.recv().unwrap();
+            let req = leader.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::None).unwrap();
         }
 
         // Respond with `Tasks::Exit` and join the workers
         for _ in 0..2 {
-            let req = master.channels.steal_requests.recv().unwrap();
+            let req = leader.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::Exit).unwrap();
         }
 
@@ -369,25 +369,25 @@ mod tests {
             }));
         }
 
-        let master = Worker::new(0, channels.remove(0), coworkers);
+        let leader = Worker::new(0, channels.remove(0), coworkers);
         barrier.wait();
 
         // Create a few dummy tasks
         for _ in 0..10 {
             let task = Async::new(Box::new(|| ()), None);
-            master.push(Box::new(task));
+            leader.push(Box::new(task));
         }
 
         // Distribute tasks until deque is empty
-        while master.has_tasks() {
-            let req = master.channels.steal_requests.recv().unwrap();
-            master.handle_steal_request(req);
+        while leader.has_tasks() {
+            let req = leader.channels.steal_requests.recv().unwrap();
+            leader.handle_steal_request(req);
             // `req` consumed
         }
 
         // Ask workers to terminate
         for _ in 0..2 {
-            let req = master.channels.steal_requests.recv().unwrap();
+            let req = leader.channels.steal_requests.recv().unwrap();
             req.response.send(Tasks::Exit).unwrap();
         }
 

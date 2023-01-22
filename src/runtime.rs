@@ -6,7 +6,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 
 pub struct Runtime {
-    pub master: &'static Worker,
+    pub leader: &'static Worker,
     workers: Vec<thread::JoinHandle<()>>,
     barrier: Arc<Barrier>,
     stats: Arc<Mutex<Stats>>,
@@ -60,22 +60,22 @@ impl Runtime {
         }
 
         Worker::new(0, channels.remove(0), coworkers).make_current();
-        let master = Worker::current();
+        let leader = Worker::current();
         Scope::init();
         barrier.wait();
 
-        Self { master, workers, barrier, stats }
+        Self { leader, workers, barrier, stats }
     }
 
     pub fn join(self) -> Stats {
-        let master = self.master;
-        assert_eq!(master.id, 0);
+        let leader = self.leader;
+        assert_eq!(leader.id, 0);
 
         // Ask workers to terminate
-        master.finalize();
+        leader.finalize();
         {
             let stats = self.stats.lock().unwrap();
-            stats.update(&master.stats);
+            stats.update(&leader.stats);
         }
         self.barrier.wait();
 
