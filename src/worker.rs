@@ -41,10 +41,11 @@ thread_local! {
 }
 
 impl Worker {
-    pub fn new(id: usize,
-               steal_requests: Receiver<StealRequest>,
-               coworkers: Vec<Coworker>) -> Self
-    {
+    pub fn new(
+        id: usize,
+        steal_requests: Receiver<StealRequest>,
+        coworkers: Vec<Coworker>
+    ) -> Self {
         let mut worker = Self {
             id,
             deque: RefCell::new(Deque::new()),
@@ -114,22 +115,22 @@ impl Worker {
         victim.send_steal_request(req);
     }
 
-    pub fn steal_one(&self) -> FutureTasks {
+    pub fn steal_one(&self) -> StealResponse {
         self.send_steal_request(StealRequest {
             thief: self.id,
             steal_many: false,
             response: self.channels.tasks.0.clone(),
         });
-        FutureTasks(&self.channels.tasks.1)
+        StealResponse(&self.channels.tasks.1)
     }
 
-    pub fn steal_many(&self) -> FutureTasks {
+    pub fn steal_many(&self) -> StealResponse {
         self.send_steal_request(StealRequest {
             thief: self.id,
             steal_many: true,
             response: self.channels.tasks.0.clone(),
         });
-        FutureTasks(&self.channels.tasks.1)
+        StealResponse(&self.channels.tasks.1)
     }
 
     pub fn handle_steal_request(&self, req: StealRequest) {
@@ -237,9 +238,9 @@ impl Clone for Coworker {
 }
 
 // The result of asynchronous work stealing
-pub struct FutureTasks<'a>(&'a Receiver<Tasks>);
+pub struct StealResponse<'a>(&'a Receiver<Tasks>);
 
-impl<'a> FutureTasks<'a> {
+impl<'a> StealResponse<'a> {
     pub fn wait(self) -> Tasks {
         let worker = Worker::current();
         loop {
