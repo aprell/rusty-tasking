@@ -23,6 +23,7 @@ on, after some progress on my own.
 - [Safe Systems Programming in Rust](https://iris-project.org/pdfs/2021-rustbelt-cacm-final.pdf)
 - [The Usability of Ownership](https://arxiv.org/abs/2011.06171)
 - How to Read Rust Functions: [Part 1](https://www.possiblerust.com/guide/how-to-read-rust-functions-part-1)
+- [Rust Atomics and Locks](https://marabos.nl/atomics/)
 
 <!-- Links -->
 
