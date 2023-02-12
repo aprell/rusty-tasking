@@ -4,7 +4,6 @@ use crate::worker::{Tasks, Worker};
 use std::cell::{Ref, RefMut, RefCell};
 use std::collections::LinkedList;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 // We use a linked list to avoid invalidating references returned by
 // Scope::current()
@@ -25,7 +24,7 @@ impl TaskCount {
     pub fn get(&self) -> u32 {
         match self {
             Self::Private(count) => count.get(),
-            Self::Shared(count) => count.get(Ordering::Relaxed),
+            Self::Shared(count) => count.get(),
         }
     }
 
@@ -38,7 +37,7 @@ impl TaskCount {
                 n
             }
             Self::Shared(count) => {
-                count.inc(Ordering::Relaxed)
+                count.inc()
             }
         }
     }
@@ -52,7 +51,7 @@ impl TaskCount {
                 n
             }
             Self::Shared(count) => {
-                count.dec(Ordering::Relaxed)
+                count.dec()
             }
         }
     }
@@ -245,9 +244,9 @@ mod tests {
             let count = scope.share();
             threads.push(thread::spawn(move || {
                 for i in 0..100 {
-                    count.inc(Ordering::Relaxed);
+                    count.inc();
                     if i % 2 == 0 {
-                        count.dec(Ordering::Relaxed);
+                        count.dec();
                     }
                 }
             }));
