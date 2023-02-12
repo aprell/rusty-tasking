@@ -3,6 +3,7 @@
 #[macro_use]
 pub mod macros;
 pub mod atomic;
+pub mod channel;
 pub mod deque;
 pub mod future;
 pub mod runtime;

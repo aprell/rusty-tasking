@@ -122,8 +122,8 @@ impl<T> Task for ScopedAsync<T> where T: Send {
 
 #[cfg(test)]
 mod tests {
+    use crate::channel::one_shot_channel;
     use crate::future::Future;
-    use std::sync::mpsc::channel;
     use std::thread;
     use super::*;
 
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn async_future() {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = one_shot_channel();
         let a = Async::new(Box::new(|| 3.14), Some(Promise::from(sender)));
         a.run();
         // `a` has been consumed
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn async_future_thread() {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = one_shot_channel();
         let a = Async::new(Box::new(|| "hi"), Some(Promise::from(sender)));
         let t = thread::spawn(|| a.run());
         assert_eq!(Future::Chan(receiver).get(), "hi");

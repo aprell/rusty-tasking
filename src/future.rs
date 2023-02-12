@@ -1,5 +1,5 @@
+use crate::channel::{one_shot_channel, Sender, Receiver};
 use crate::worker::{Tasks, Worker};
-use std::sync::mpsc::{channel, Sender, Receiver};
 
 // Futures and promises
 
@@ -28,14 +28,31 @@ impl<T> Future<T> {
         match self {
             // Panic if opt.is_none() (better than waiting forever)
             Self::Lazy(opt) => opt.unwrap(),
-            Self::Chan(chan) => chan.recv().unwrap(),
+            Self::Chan(chan) => {
+                while !chan.is_ready() {
+                    std::hint::spin_loop();
+                }
+                chan.receive()
+            }
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        match self {
+            Self::Lazy(opt) => opt.is_some(),
+            Self::Chan(chan) => chan.is_ready(),
         }
     }
 
     fn try_get(&mut self) -> Option<T> {
         match self {
             Self::Lazy(opt) => opt.take(),
-            Self::Chan(chan) => chan.try_recv().ok(),
+            Self::Chan(chan) => {
+                match chan.is_ready() {
+                    true => Some(chan.receive()),
+                    false => None,
+                }
+            },
         }
     }
 
@@ -81,7 +98,7 @@ impl<T> Promise<T> {
     pub fn promote(&mut self) {
         match *self {
             Self::Lazy(fut) => {
-                let (sender, receiver) = channel();
+                let (sender, receiver) = one_shot_channel();
                 unsafe { *fut = Future::Chan(receiver); }
                 *self = Self::Chan(sender);
             },
@@ -104,7 +121,7 @@ impl<T> Promise<T> {
                 }
             }
             Self::Chan(chan) => {
-                chan.send(value).unwrap();
+                chan.send(value);
             }
         }
     }
@@ -129,7 +146,7 @@ mod tests {
 
     #[test]
     fn future_promise() {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = one_shot_channel();
         Promise::Chan(sender).set(1);
         assert_eq!(Future::Chan(receiver).get(), 1);
     }
@@ -144,10 +161,10 @@ mod tests {
 
     #[test]
     fn future_promise_thread() {
-        let (sender1, receiver1) = channel();
+        let (sender1, receiver1) = one_shot_channel();
 
         let t = thread::spawn(|| {
-            let (sender2, receiver2) = channel();
+            let (sender2, receiver2) = one_shot_channel();
             Promise::Chan(sender1).set(("ping", Promise::Chan(sender2)));
             assert_eq!(Future::Chan(receiver2).get(), "pong");
         });
