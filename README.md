@@ -25,6 +25,11 @@ on, after some progress on my own.
 - How to Read Rust Functions: [Part 1](https://www.possiblerust.com/guide/how-to-read-rust-functions-part-1)
 - [Rust Atomics and Locks](https://marabos.nl/atomics/)
 
+## Other Bookmarks
+
+- [A hand-rolled replacement of Rayon](https://gendignoux.com/blog/2024/11/18/rust-rayon-optimized.html#a-hand-rolled-replacement-of-rayon)
+  (discusses work splitting)
+
 <!-- Links -->
 
 [1]: https://github.com/aprell/tasking-2.0
